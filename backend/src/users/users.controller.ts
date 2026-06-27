@@ -8,6 +8,7 @@ import {
   Param,
   UseGuards,
   Req,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -46,8 +47,9 @@ export class UsersController {
 
   @Roles(Role.PROJECT_COORDINATOR)
   @Get('interns-monitoring')
-  getInternsMonitoring(@Req() req: any) {
-    return this.usersService.getInternsMonitoring(req.user.id);
+  getInternsMonitoring(@Req() req: any, @Query('all') all?: string) {
+    const allDomains = all === 'true';
+    return this.usersService.getInternsMonitoring(req.user.id, allDomains);
   }
 
   @Roles(Role.ADMIN)

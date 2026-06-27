@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
 import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui';
@@ -12,8 +12,12 @@ export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
 
   const emailLabel = useMemo(() => {
     if (selectedRole === 'admin') return 'Admin Username or Email';
@@ -56,260 +60,291 @@ export const Login: React.FC = () => {
     setPassword('');
   };
 
-  // Generate deterministic particles for background
-  const particles = useMemo(() => {
-    return Array.from({ length: 15 }, (_, i) => ({
-      id: i,
-      left: `${(i * 7) % 95}%`,
-      top: `${(i * 13) % 95}%`,
-      size: `${((i * 3) % 5) + 3}px`,
-      delay: `${(i * 0.8) % 8}s`,
-      duration: `${((i * 4) % 8) + 12}s`,
-    }));
-  }, []);
-
-  // Configuration for 5 sliding image cards (plus 1 duplicate for seamless loop)
-  const carouselCards = [
+  // Carousel Configuration
+  const carouselCards = useMemo(() => [
     {
       image: '/classroom.png',
-      caption: 'Corporate Classroom',
-      topic: 'Corporate Training',
+      title: 'Industry-Focused Training',
+      desc: 'Expert-led curriculum mapped to real-world corporate requirements.'
+    },
+    {
+      image: '/team.png',
+      title: 'Internship Programs',
+      desc: 'Practical exposure working within simulated corporate environments.'
     },
     {
       image: '/software_dev.png',
-      caption: 'Software Engineering',
-      topic: 'Software Development Team',
-    },
-    {
-      image: '/learning.png',
-      caption: 'Teaching Session',
-      topic: 'Project Coordinator Session',
-    },
-    {
-      image: '/online.png',
-      caption: 'Digital Courses',
-      topic: 'Online Learning',
+      title: 'Project-Based Learning',
+      desc: 'Apply knowledge directly to coding challenges and systems engineering.'
     },
     {
       image: '/discussion.png',
-      caption: 'Interactive Brainstorming',
-      topic: 'Project Collaboration',
+      title: 'Placement Assistance',
+      desc: 'Guidance and linkages with partner enterprises to launch your career.'
     },
-    // Duplicate of Card 1 for seamless vertical loop transition
     {
-      image: '/classroom.png',
-      caption: 'Corporate Classroom',
-      topic: 'Corporate Training',
-    },
-  ];
+      image: '/learning.png',
+      title: 'Certifications & Skill Development',
+      desc: 'Validate your competence with shareable, secure graduation certificates.'
+    }
+  ], []);
+
+  // Carousel Autoplay Timer
+  useEffect(() => {
+    if (isPaused) return;
+    const interval = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % carouselCards.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [isPaused, carouselCards.length]);
+
+  // Floating background shape particles
+  const particles = useMemo(() => {
+    return Array.from({ length: 10 }, (_, i) => ({
+      id: i,
+      left: `${(i * 9) % 95}%`,
+      top: `${(i * 17) % 95}%`,
+      size: `${((i * 4) % 6) + 4}px`,
+      delay: `${(i * 1.2) % 8}s`,
+      duration: `${((i * 5) % 10) + 15}s`,
+    }));
+  }, []);
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#f8fafc] dark:bg-[#0c232c] overflow-hidden select-none">
+    <div className="relative min-h-screen w-full flex items-center justify-center bg-[#07162c] py-12 px-4 sm:px-6 lg:px-8 overflow-hidden select-none font-sans">
+      
+      {/* Background image visible at 65% opacity */}
+      <div 
+        className="absolute inset-0 bg-[url('/software_dev.png')] bg-cover bg-center mix-blend-overlay opacity-65 pointer-events-none z-0" 
+      />
 
-      {/* LEFT SIDE (60% width on Desktop) */}
-      <div className="w-full lg:w-[60%] min-h-screen bg-[#0a2540] text-white flex flex-col justify-between p-8 xl:p-12 relative overflow-hidden">
+      {/* Decorative Orbs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-[#0F4C81]/15 blur-3xl pointer-events-none z-0 animate-glow-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-[#38bdf8]/10 blur-3xl pointer-events-none z-0 animate-glow-pulse" />
 
-        {/* Soft Glowing Elements (Background orbs) */}
-        <div className="w-[450px] h-[450px] bg-[#0F4C81]/10 rounded-full blur-3xl absolute top-[5%] left-[-5%] animate-glow-pulse pointer-events-none" />
-        <div className="w-[500px] h-[500px] bg-[#0F4C81]/40 rounded-full blur-3xl absolute bottom-[5%] right-[-5%] animate-glow-pulse pointer-events-none" />
+      {/* Rising particles */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        {particles.map((p) => (
+          <div
+            key={p.id}
+            className="absolute bg-white/10 rounded-full animate-particle"
+            style={{
+              left: p.left,
+              top: p.top,
+              width: p.size,
+              height: p.size,
+              animationDelay: p.delay,
+              animationDuration: p.duration,
+            }}
+          />
+        ))}
+      </div>
 
-        {/* Animated background shape elements */}
-        <div className="absolute top-[15%] left-[-10%] w-64 h-64 rounded-full border border-teal-500/20 bg-teal-500/5 blur-xs animate-shape-1 pointer-events-none" />
-        <div className="absolute bottom-[25%] right-[-10%] w-80 h-80 rounded-3xl border border-[#0F4C81]/15 bg-[#0F4C81]/5 blur-xs animate-shape-2 pointer-events-none" />
-
-        {/* Rising glowing particles */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-          {particles.map((p) => (
-            <div
-              key={p.id}
-              className="absolute bg-white/15 rounded-full animate-particle"
-              style={{
-                left: p.left,
-                top: p.top,
-                width: p.size,
-                height: p.size,
-                animationDelay: p.delay,
-                animationDuration: p.duration,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Branding Area Centered at the Very Top */}
-        <div className="w-full text-center z-10 flex flex-col items-center">
-          {/* Large Company Logo */}
-          <div className="p-8 rounded-2xl bg-white shadow-2xl flex items-center justify-center mb-6 max-w-[420px] w-full transition-all duration-300 hover:scale-[1.02] overflow-hidden">
-            <img src="/logo.png" alt="Career Solutions Logo" className="h-28 w-auto object-contain scale-110" />
+      {/* Main Container */}
+      <div className="relative z-10 w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+        
+        {/* Left Section: Centered Branding & Carousel */}
+        <div className="lg:col-span-7 flex flex-col justify-center items-center text-center text-white space-y-8 animate-fade-in">
+          
+          {/* Logo & Headline */}
+          <div className="space-y-4 flex flex-col items-center">
+            <div className="inline-flex items-center justify-center p-5 bg-white/95 rounded-3xl shadow-2xl transition-all duration-300 hover:scale-[1.02] mx-auto">
+              <img src="/logo.png" alt="Career Solutions Logo" className="h-24 w-auto object-contain" />
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight font-display bg-gradient-to-r from-white via-slate-100 to-sky-300 bg-clip-text text-transparent">
+                Career Solutions LMS
+              </h1>
+              <p className="text-lg sm:text-xl font-bold text-sky-400 font-display leading-tight max-w-xl mx-auto">
+                "Empowering Future Professionals Through Industry-Focused Learning."
+              </p>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed mx-auto">
+              Career Solutions LMS is an enterprise-grade digital academy offering professional curriculums, interactive skill assessments, and direct project evaluations to build career-ready technical competencies.
+            </p>
           </div>
-          {/* Company Tagline */}
-          <p className="text-base xl:text-lg font-medium text-teal-200 mt-2 font-display drop-shadow-sm">
-            "Bridge The Gap, Accelerate Your Career"
-          </p>
 
-          {/* Company Description */}
-          <p className="text-xs xl:text-sm text-white/80 mt-3 max-w-xl text-center leading-relaxed font-sans px-4">
-            Career Solutions is a corporate learning platform that helps interns and employees gain industry-ready skills through structured courses, projects, assessments, and certifications.
-          </p>
-        </div>
-
-        {/* PHOTO SECTION (Auto-sliding vertical carousel of 5 cards) */}
-        <div className="w-full max-w-[400px] xl:max-w-[440px] mx-auto my-8 z-10 relative">
-          {/* Carousel Viewport Box */}
-          <div className="h-[236px] overflow-hidden relative w-full rounded-[24px] border border-white/10 shadow-inner">
-            <div className="flex flex-col gap-4 animate-vertical-slide hover:[animation-play-state:paused]">
-              {carouselCards.map((card, idx) => (
-                <div
-                  key={idx}
-                  className="h-[220px] w-full flex-shrink-0 p-1.5 rounded-[20px] glassmorphism border border-white/25 shadow-md hover:scale-[1.03] hover:shadow-xl transition-all duration-300 ease-out cursor-pointer group relative overflow-hidden"
-                >
-                  <img
-                    src={card.image}
-                    alt={card.topic}
-                    className="w-full h-full object-cover rounded-[14px] group-hover:scale-105 transition-transform duration-700 ease-out"
-                  />
-                  {/* Subtle dark gradient overlay inside the card */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent rounded-[14px]" />
-
-                  {/* Card text tag */}
-                  <div className="absolute bottom-4 left-4 right-4 p-3.5 rounded-xl bg-black/40 backdrop-blur-md border border-white/10 text-left flex flex-col items-start">
-                    <span className="text-[10px] font-bold text-teal-300 uppercase tracking-widest font-display">
-                      {card.topic}
-                    </span>
-                    <h3 className="text-xs xl:text-sm font-bold text-white mt-0.5">
-                      {card.caption}
-                    </h3>
-                  </div>
+          {/* Carousel */}
+          <div
+            className="relative h-72 w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl group bg-slate-900/50 backdrop-blur-sm"
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
+            {carouselCards.map((slide, idx) => (
+              <div
+                key={idx}
+                className={`absolute inset-0 transition-all duration-1000 flex flex-col justify-end p-8 ${
+                  idx === activeSlide ? 'opacity-100 scale-100 z-10' : 'opacity-0 scale-95 z-0'
+                }`}
+              >
+                {/* Background image */}
+                <img
+                  src={slide.image}
+                  alt={slide.title}
+                  className="absolute inset-0 w-full h-full object-cover transform transition-transform duration-[6000ms]"
+                />
+                {/* Overlay gradient */}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+                
+                {/* Caption info */}
+                <div className="relative z-10 space-y-1">
+                  <span className="text-[9px] font-black text-sky-400 uppercase tracking-widest bg-sky-950/60 border border-sky-800/30 px-2 py-0.5 rounded-full inline-block">
+                    Curriculum Highlight
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-black text-white">{slide.title}</h3>
+                  <p className="text-xs text-slate-300 max-w-xl leading-relaxed">{slide.desc}</p>
                 </div>
+              </div>
+            ))}
+
+            {/* Carousel Dot Indicators */}
+            <div className="absolute bottom-6 right-8 z-20 flex space-x-2">
+              {carouselCards.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveSlide(idx)}
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                    idx === activeSlide ? 'w-5 bg-sky-400' : 'w-1.5 bg-white/40 hover:bg-white/70'
+                  }`}
+                  aria-label={`Show feature ${idx + 1}`}
+                />
               ))}
             </div>
           </div>
+
         </div>
 
-        {/* Footer info */}
-        <div className="text-center text-[10px] text-white/40 tracking-wider uppercase z-10 border-t border-white/10 pt-4 w-full">
-          © {new Date().getFullYear()} Career Solutions LMS. All Rights Reserved.
-        </div>
-      </div>
+        {/* Right Section: Login Card */}
+        <div className="lg:col-span-5 flex justify-center">
+          
+          <Card className="w-full max-w-md border border-white/10 bg-slate-900/60 backdrop-blur-lg shadow-2xl rounded-3xl p-6 sm:p-8 space-y-6 text-white animate-slide-up">
+            
+            <CardHeader className="p-0 space-y-2 text-center">
+              <h2 className="text-2xl font-black tracking-tight text-white font-display">Welcome Back</h2>
+              <p className="text-xs text-slate-400">
+                Log in to resume your training, complete assessments, and download credentials.
+              </p>
+            </CardHeader>
 
-      {/* RIGHT SIDE (40% width on Desktop, Centered login form) */}
-      <div className="w-full lg:w-[40%] min-h-screen flex items-center justify-center p-6 xl:p-12 bg-[#f0f9fa]/40 dark:bg-[#0c232c]/95 relative overflow-y-auto z-10 border-t lg:border-t-0 lg:border-l border-slate-200/50 dark:border-slate-800/50">
-
-        {/* Background decorative blobs for mobile devices */}
-        <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-primary/10 rounded-full blur-3xl lg:hidden pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-[#17A2B8]/10 rounded-full blur-3xl lg:hidden pointer-events-none" />
-
-        {/* Form Card wrapper */}
-        <Card className="w-full max-w-md border border-border bg-card/75 backdrop-blur-md shadow-2xl glow-indigo">
-          <CardHeader className="space-y-4 text-center pb-4 pt-6">
-            <div className="mx-auto flex items-center justify-center mb-4 p-6 rounded-xl bg-white border border-slate-100 shadow-md max-w-[280px] w-full transition-all duration-300 hover:scale-105 overflow-hidden">
-              <img src="/logo.png" alt="Career Solutions Logo" className="h-20 w-auto object-contain scale-110" />
-            </div>
-            <CardTitle className="text-2xl font-bold font-display tracking-tight text-foreground">
-              Welcome Back
-            </CardTitle>
-            <CardDescription className="text-xs max-w-sm mx-auto leading-relaxed mt-1.5">
-              Access your corporate training academy portal to view courses, take assessments, and track certificates.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4.5">
+            <CardContent className="p-0 space-y-5">
+              
               {error && (
-                <div className="p-3 text-xs bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-left font-semibold animate-fade-in">
+                <div className="p-3 text-xs bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-left font-semibold animate-fade-in">
                   {error}
                 </div>
               )}
 
-              <div className="relative">
-                <Mail className="absolute left-3 top-9.5 h-4 w-4 text-muted-foreground/60" />
-                <Input
-                  label={emailLabel}
-                  id="email"
-                  type="text"
-                  placeholder={emailPlaceholder}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-9 h-11"
-                  disabled={loading}
-                />
-              </div>
+              <form onSubmit={handleSubmit} className="space-y-4 text-left">
+                
+                <div className="relative space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{emailLabel}</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />
+                    <Input
+                      id="email"
+                      type="text"
+                      placeholder={emailPlaceholder}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10 h-11 bg-slate-950/40 border-slate-800 text-white rounded-xl focus:border-sky-500 focus:ring-sky-500 text-xs sm:text-sm"
+                      disabled={loading}
+                      required
+                    />
+                  </div>
+                </div>
 
-              <div className="relative">
-                <Lock className="absolute left-3 top-9.5 h-4 w-4 text-muted-foreground/60" />
-                <Input
-                  label="Password"
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-9 pr-10 h-11"
+                <div className="relative space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10 h-11 bg-slate-950/40 border-slate-800 text-white rounded-xl focus:border-sky-500 focus:ring-sky-500 text-xs sm:text-sm"
+                      disabled={loading}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 focus:outline-none cursor-pointer"
+                      disabled={loading}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remember Me Row */}
+                <div className="flex items-center py-1 text-xs">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="rememberMe"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="h-4 w-4 text-sky-500 border-slate-700 bg-slate-950 rounded focus:ring-sky-500"
+                    />
+                    <label htmlFor="rememberMe" className="text-slate-400 font-medium select-none cursor-pointer">
+                      Remember Me
+                    </label>
+                  </div>
+                </div>
+
+                <Button 
+                  type="submit" 
+                  className="w-full h-11 text-xs sm:text-sm font-bold tracking-wide rounded-xl bg-gradient-to-r from-[#0F4C81] to-[#38bdf8] hover:from-[#0f4c81]/95 hover:to-[#38bdf8]/95 hover:scale-[1.01] active:scale-[0.99] transition-all text-white flex items-center justify-center shadow-lg shadow-sky-950/30"
                   disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-9.5 text-muted-foreground/60 hover:text-foreground focus:outline-none cursor-pointer"
-                  disabled={loading}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <>
+                      Log In
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
                   )}
-                </button>
+                </Button>
+
+              </form>
+
+              {/* Role Selection */}
+              <div className="pt-4 border-t border-slate-800 text-left space-y-2.5">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Quick Role Selector
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['admin', 'project-coordinator', 'intern'] as const).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => handleRoleSelect(role)}
+                      className={`text-[10px] font-bold py-2 px-1.5 rounded-lg border transition-all cursor-pointer text-center leading-tight ${
+                        selectedRole === role
+                          ? 'bg-[#0F4C81]/20 border-[#38bdf8] text-[#38bdf8] shadow-xs'
+                          : 'bg-slate-950/20 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      {role === 'project-coordinator' ? 'Coordinator' : role.charAt(0).toUpperCase() + role.slice(1)}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <Button type="submit" className="w-full h-11 text-sm font-semibold tracking-wide" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  <>
-                    Log In
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            </form>
+            </CardContent>
+          </Card>
+          
+        </div>
 
-            {/* Role Selection */}
-            <div className="mt-8 pt-6 border-t border-border/50 text-left">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 font-display">
-                Select Your Role:
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant={selectedRole === 'admin' ? 'primary' : 'outline'}
-                  size="sm"
-                  onClick={() => handleRoleSelect('admin')}
-                  className="text-xs h-8.5"
-                >
-                  Admin
-                </Button>
-                <Button
-                  variant={selectedRole === 'project-coordinator' ? 'primary' : 'outline'}
-                  size="sm"
-                  onClick={() => handleRoleSelect('project-coordinator')}
-                  className="text-xs h-8.5"
-                >
-                  Project Coordinator
-                </Button>
-                <Button
-                  variant={selectedRole === 'intern' ? 'primary' : 'outline'}
-                  size="sm"
-                  onClick={() => handleRoleSelect('intern')}
-                  className="text-xs h-8.5"
-                >
-                  Intern
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
+
     </div>
   );
 };

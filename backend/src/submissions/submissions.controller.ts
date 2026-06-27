@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -24,7 +25,7 @@ import * as fs from 'fs';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('submissions')
 export class SubmissionsController {
-  constructor(private submissionsService: SubmissionsService) {}
+  constructor(private submissionsService: SubmissionsService) { }
 
   @Post()
   @Roles(Role.INTERN)
@@ -34,6 +35,7 @@ export class SubmissionsController {
       req.user.id,
       body.submissionText,
       body.fileUrl,
+      body.fileName,
     );
   }
 
@@ -57,10 +59,42 @@ export class SubmissionsController {
       }),
     }),
   )
-  uploadFile(@UploadedFile() file: any) {
+  async uploadFile(
+    @UploadedFile() file: any,
+    @Body('assignmentId') assignmentId: string,
+    @Req() req: any,
+  ) {
     if (!file) throw new BadRequestException('No file uploaded');
+    if (!assignmentId) throw new BadRequestException('assignmentId is required');
     const fileUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/uploads/${file.filename}`;
-    return { fileUrl, originalName: file.originalname };
+    
+    // Save record to database permanently immediately upon upload
+    const submission = await this.submissionsService.saveUpload(
+      assignmentId,
+      req.user.id,
+      fileUrl,
+      file.originalname,
+    );
+
+    return { fileUrl, originalName: file.originalname, submission };
+  }
+
+  @Delete(':id')
+  @Roles(Role.ADMIN, Role.INTERN)
+  delete(@Param('id') id: string, @Req() req: any) {
+    return this.submissionsService.delete(id, req.user.id, req.user.role);
+  }
+
+  @Get()
+  @Roles(Role.ADMIN, Role.PROJECT_COORDINATOR, Role.INTERN)
+  findAll(@Req() req: any) {
+    if (req.user.role === Role.INTERN) {
+      return this.submissionsService.getMySubmissions(req.user.id);
+    } else if (req.user.role === Role.PROJECT_COORDINATOR) {
+      return this.submissionsService.getProjectCoordinatorSubmissions(req.user.id);
+    } else {
+      return this.submissionsService.getAllSubmissions();
+    }
   }
 
   @Patch(':id/grade')

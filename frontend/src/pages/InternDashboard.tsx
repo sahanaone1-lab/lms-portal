@@ -27,10 +27,13 @@ const ProjectSubmissionForm: React.FC<ProjectSubmissionFormProps> = ({ assignmen
 
     setUploading(true);
     try {
-      const res = await submissionService.upload(file);
+      const res = await submissionService.upload(file, assignment.id);
       setFileUrl(res.fileUrl);
       setFileName(res.originalName);
       alert('File uploaded successfully!');
+      if (res.submission) {
+        onSuccess(res.submission);
+      }
     } catch (err) {
       alert('Failed to upload file to backend.');
     } finally {
@@ -92,6 +95,29 @@ const ProjectSubmissionForm: React.FC<ProjectSubmissionFormProps> = ({ assignmen
       </Button>
     </form>
   );
+};
+
+const getBulletPoints = (contentText: string) => {
+  if (!contentText) return [];
+  const sentences = contentText
+    .split(/[.;]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 5);
+
+  return sentences.map((sentence) => {
+    if (sentence.includes(':')) {
+      const [boldPart, rest] = sentence.split(':', 2);
+      return { bold: boldPart.trim() + ':', text: rest.trim() };
+    }
+    const words = sentence.split(' ');
+    if (words.length <= 3) {
+      return { bold: sentence, text: '' };
+    }
+    const boldWordCount = Math.min(3, Math.max(1, Math.round(words.length * 0.25)));
+    const boldPart = words.slice(0, boldWordCount).join(' ');
+    const rest = words.slice(boldWordCount).join(' ');
+    return { bold: boldPart, text: rest };
+  });
 };
 
 export const InternDashboard: React.FC = () => {
@@ -439,14 +465,20 @@ export const InternDashboard: React.FC = () => {
 
   const handleAssignmentFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !selectedAssignment) return;
 
     setSubmitFileUploading(true);
     try {
-      const res = await submissionService.upload(file);
+      const res = await submissionService.upload(file, selectedAssignment.id);
       setSubmitFile(res.fileUrl);
       setSubmitFileName(res.originalName);
       alert('File uploaded successfully!');
+      if (res.submission) {
+        setMySubmissions(prev => ({
+          ...prev,
+          [selectedAssignment.id]: res.submission
+        }));
+      }
     } catch (err) {
       alert('Failed to upload file.');
     } finally {
@@ -631,14 +663,38 @@ export const InternDashboard: React.FC = () => {
                               <span className="text-[9px] text-muted-foreground uppercase font-semibold">Attached Asset / Link</span>
                               <div className="mt-1">
                                 {submission.fileUrl ? (
-                                  <a
-                                    href={submission.fileUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center text-primary font-bold hover:underline"
-                                  >
-                                    View Submitted Work <ExternalLink className="h-3 w-3 ml-1" />
-                                  </a>
+                                  <div className="flex items-center justify-between gap-2 mt-1">
+                                    <a
+                                      href={submission.fileUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center text-primary font-bold hover:underline"
+                                    >
+                                      View Submitted Work <ExternalLink className="h-3 w-3 ml-1" />
+                                    </a>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      className="bg-red-600 hover:bg-red-700 text-white text-[10px] h-7 px-2.5 rounded-lg flex items-center gap-1.5 shrink-0 ml-2"
+                                      onClick={async () => {
+                                        if (confirm('Are you sure you want to delete this uploaded project file? This will permanently delete the file record and physical file.')) {
+                                          try {
+                                            await submissionService.delete(submission.id);
+                                            setMySubmissions(prev => {
+                                              const next = { ...prev };
+                                              delete next[assignment.id];
+                                              return next;
+                                            });
+                                            toast.success('Project deleted successfully.');
+                                          } catch (err: any) {
+                                            toast.error(err.response?.data?.message || 'Failed to delete project.');
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      Delete Project
+                                    </Button>
+                                  </div>
                                 ) : (
                                   <span className="text-muted-foreground">No file link</span>
                                 )}
@@ -655,8 +711,8 @@ export const InternDashboard: React.FC = () => {
                           {/* Evaluation remarks */}
                           {isGraded && (
                             <div className={`p-4 rounded-lg border text-xs space-y-1.5 ${isApproved
-                                ? 'bg-emerald-500/[0.02] border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                                : 'bg-destructive/[0.02] border-destructive/20 text-destructive'
+                              ? 'bg-emerald-500/[0.02] border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                              : 'bg-destructive/[0.02] border-destructive/20 text-destructive'
                               }`}>
                               <p className="font-bold flex items-center gap-1.5">
                                 {isApproved ? <CheckCircle className="h-4 w-4 shrink-0" /> : <X className="h-4 w-4 shrink-0" />}
@@ -942,7 +998,7 @@ export const InternDashboard: React.FC = () => {
                 className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-all shadow-sm ${showAiAssistant
                   ? 'bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-400 border-teal-200 dark:border-teal-800'
                   : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-teal-50 dark:hover:bg-teal-950/20 hover:text-teal-700'
-                }`}
+                  }`}
               >
                 <Bot className="h-4 w-4 text-teal-500" />
                 {showAiAssistant ? 'Hide AI' : 'AI Assistant'}
@@ -962,57 +1018,57 @@ export const InternDashboard: React.FC = () => {
               const d = (activeCourse.domain || '').toLowerCase();
               if (d.includes('cyber') || d.includes('security')) return (
                 <svg viewBox="0 0 80 80" fill="none" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M40 8L14 20v18c0 15.5 11.1 30 26 34 14.9-4 26-18.5 26-34V20L40 8z" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
-                  <path d="M40 18L22 27v13c0 10.8 7.8 20.9 18 23.7C50.2 61 58 50.9 58 40V27L40 18z" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.25)" strokeWidth="1"/>
-                  <circle cx="40" cy="38" r="7" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5"/>
-                  <line x1="40" y1="45" x2="40" y2="52" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M40 8L14 20v18c0 15.5 11.1 30 26 34 14.9-4 26-18.5 26-34V20L40 8z" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+                  <path d="M40 18L22 27v13c0 10.8 7.8 20.9 18 23.7C50.2 61 58 50.9 58 40V27L40 18z" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.25)" strokeWidth="1" />
+                  <circle cx="40" cy="38" r="7" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
+                  <line x1="40" y1="45" x2="40" y2="52" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               );
               if (d.includes('full stack') || d.includes('web') || d.includes('frontend') || d.includes('backend')) return (
                 <svg viewBox="0 0 80 80" fill="none" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="10" y="16" width="60" height="42" rx="4" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5"/>
-                  <rect x="10" y="16" width="60" height="10" rx="4" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" strokeWidth="1"/>
-                  <circle cx="18" cy="21" r="2" fill="rgba(255,120,120,0.7)"/>
-                  <circle cx="25" cy="21" r="2" fill="rgba(255,200,100,0.7)"/>
-                  <circle cx="32" cy="21" r="2" fill="rgba(100,220,100,0.7)"/>
-                  <path d="M22 36l-8 6 8 6" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M58 36l8 6-8 6" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M46 32l-12 18" stroke="rgba(255,255,255,0.45)" strokeWidth="2" strokeLinecap="round"/>
+                  <rect x="10" y="16" width="60" height="42" rx="4" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
+                  <rect x="10" y="16" width="60" height="10" rx="4" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+                  <circle cx="18" cy="21" r="2" fill="rgba(255,120,120,0.7)" />
+                  <circle cx="25" cy="21" r="2" fill="rgba(255,200,100,0.7)" />
+                  <circle cx="32" cy="21" r="2" fill="rgba(100,220,100,0.7)" />
+                  <path d="M22 36l-8 6 8 6" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M58 36l8 6-8 6" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M46 32l-12 18" stroke="rgba(255,255,255,0.45)" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               );
               if (d.includes('data') || d.includes('analytics') || d.includes('ml') || d.includes('ai')) return (
                 <svg viewBox="0 0 80 80" fill="none" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="10" y="55" width="12" height="16" rx="2" fill="rgba(255,255,255,0.3)"/>
-                  <rect x="26" y="42" width="12" height="29" rx="2" fill="rgba(255,255,255,0.22)"/>
-                  <rect x="42" y="30" width="12" height="41" rx="2" fill="rgba(255,255,255,0.18)"/>
-                  <rect x="58" y="18" width="12" height="53" rx="2" fill="rgba(255,255,255,0.15)"/>
-                  <path d="M16 54L32 41L48 29L64 17" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <circle cx="16" cy="54" r="3" fill="rgba(255,255,255,0.8)"/><circle cx="32" cy="41" r="3" fill="rgba(255,255,255,0.8)"/>
-                  <circle cx="48" cy="29" r="3" fill="rgba(255,255,255,0.8)"/><circle cx="64" cy="17" r="3" fill="rgba(255,255,255,0.8)"/>
+                  <rect x="10" y="55" width="12" height="16" rx="2" fill="rgba(255,255,255,0.3)" />
+                  <rect x="26" y="42" width="12" height="29" rx="2" fill="rgba(255,255,255,0.22)" />
+                  <rect x="42" y="30" width="12" height="41" rx="2" fill="rgba(255,255,255,0.18)" />
+                  <rect x="58" y="18" width="12" height="53" rx="2" fill="rgba(255,255,255,0.15)" />
+                  <path d="M16 54L32 41L48 29L64 17" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="16" cy="54" r="3" fill="rgba(255,255,255,0.8)" /><circle cx="32" cy="41" r="3" fill="rgba(255,255,255,0.8)" />
+                  <circle cx="48" cy="29" r="3" fill="rgba(255,255,255,0.8)" /><circle cx="64" cy="17" r="3" fill="rgba(255,255,255,0.8)" />
                 </svg>
               );
               if (d.includes('network') || d.includes('cisco') || d.includes('ccna')) return (
                 <svg viewBox="0 0 80 80" fill="none" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="40" cy="40" r="6" fill="rgba(255,255,255,0.3)" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5"/>
-                  <circle cx="14" cy="24" r="5" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5"/>
-                  <circle cx="66" cy="24" r="5" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5"/>
-                  <circle cx="14" cy="56" r="5" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5"/>
-                  <circle cx="66" cy="56" r="5" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5"/>
-                  <line x1="19" y1="26" x2="34" y2="37" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
-                  <line x1="61" y1="26" x2="46" y2="37" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
-                  <line x1="19" y1="54" x2="34" y2="43" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
-                  <line x1="61" y1="54" x2="46" y2="43" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
+                  <circle cx="40" cy="40" r="6" fill="rgba(255,255,255,0.3)" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
+                  <circle cx="14" cy="24" r="5" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
+                  <circle cx="66" cy="24" r="5" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
+                  <circle cx="14" cy="56" r="5" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
+                  <circle cx="66" cy="56" r="5" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
+                  <line x1="19" y1="26" x2="34" y2="37" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+                  <line x1="61" y1="26" x2="46" y2="37" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+                  <line x1="19" y1="54" x2="34" y2="43" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+                  <line x1="61" y1="54" x2="46" y2="43" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
                 </svg>
               );
               // Default tech / learning illustration
               return (
                 <svg viewBox="0 0 80 80" fill="none" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="12" y="20" width="56" height="40" rx="4" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5"/>
-                  <path d="M12 30h56" stroke="rgba(255,255,255,0.2)" strokeWidth="1"/>
-                  <path d="M28 20v40" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/>
-                  <circle cx="49" cy="46" r="8" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
-                  <path d="M46 46l2 2 4-5" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M17 36h7M17 41h7M17 46h7" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeLinecap="round"/>
+                  <rect x="12" y="20" width="56" height="40" rx="4" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
+                  <path d="M12 30h56" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+                  <path d="M28 20v40" stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+                  <circle cx="49" cy="46" r="8" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+                  <path d="M46 46l2 2 4-5" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M17 36h7M17 41h7M17 46h7" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
               );
             })();
@@ -1146,6 +1202,10 @@ export const InternDashboard: React.FC = () => {
                     const isSelected = activeModuleId === week.id;
                     const isCompleted = isWeekCompleted(week.id, activeCourse);
                     const isProject = week.type === 'Project';
+                    const projectIndex = isProject
+                      ? weeks.slice(0, wIdx + 1).filter((w) => w.type === 'Project').length
+                      : 0;
+
                     return (
                       <button
                         key={week.id}
@@ -1158,22 +1218,49 @@ export const InternDashboard: React.FC = () => {
                         className={`w-full text-left px-4 py-3.5 flex items-center gap-3 transition-all duration-200 border-l-[3px] ${isSelected
                           ? 'bg-[#EAF4F8] dark:bg-[#0F4C81]/15 border-[#0F4C81] dark:border-blue-400'
                           : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
-                        }`}
+                          }`}
                       >
                         <div className={`flex-shrink-0 h-9 w-9 rounded-xl flex items-center justify-center text-xs font-bold transition-colors ${isSelected
                           ? 'bg-[#0F4C81] dark:bg-blue-600 text-white shadow-sm'
-                          : isCompleted ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                        }`}>
-                          {isCompleted ? <CheckCircle className="h-4 w-4" /> : <span>{wIdx + 1}</span>}
+                          : isCompleted ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                          }`}>
+                          {isCompleted ? <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-sm">✓</span> : <span>{isProject ? `P${projectIndex}` : wIdx + 1}</span>}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${isSelected ? 'text-[#17A2B8]' : isProject ? 'text-amber-500' : 'text-slate-400 dark:text-slate-500'}`}>
-                            {isProject ? 'Project Week' : `Module ${wIdx + 1}`}
+                            {isProject ? `Project ${projectIndex}` : `Module ${wIdx + 1}`}
                           </div>
                           <div className={`text-xs leading-snug font-medium ${isSelected ? 'text-[#0F4C81] dark:text-blue-300 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>
                             {week.title}
                           </div>
+                          {isCompleted && (
+                            <div className="mt-1 flex flex-col gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                              {(() => {
+                                const { assignments } = getWeekItems(week.id, activeCourse);
+                                const grades = assignments
+                                  .map(a => mySubmissions[a.id]?.grade)
+                                  .filter(g => g !== undefined && g !== null);
+                                const dates = assignments
+                                  .map(a => mySubmissions[a.id]?.gradedAt || mySubmissions[a.id]?.createdAt)
+                                  .filter(Boolean);
+                                
+                                const avgGrade = grades.length > 0
+                                  ? Math.round(grades.reduce((a, b) => a + b, 0) / grades.length)
+                                  : null;
+                                const completionDate = dates.length > 0
+                                  ? new Date(Math.max(...dates.map(d => new Date(d).getTime()))).toLocaleDateString()
+                                  : null;
+
+                                return (
+                                  <>
+                                    {avgGrade !== null && <span>Grade: {avgGrade}/100</span>}
+                                    {completionDate && <span>Completed: {completionDate}</span>}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
                         </div>
                         <ChevronRight className={`h-4 w-4 flex-shrink-0 transition-colors ${isSelected ? 'text-[#0F4C81] dark:text-blue-400' : 'text-slate-300 dark:text-slate-600'}`} />
                       </button>
@@ -1266,7 +1353,35 @@ export const InternDashboard: React.FC = () => {
                             </div>
                           </button>
                           {isExpanded && (
-                            <div className="px-6 pb-6 pt-3 bg-[#EAF4F8]/40 dark:bg-[#0F4C81]/5 border-t border-slate-100 dark:border-slate-800 space-y-4 animate-fade-in">
+                            <div className="px-6 pb-6 pt-3 bg-[#EAF4F8]/40 dark:bg-[#0F4C81]/5 border-t border-slate-100 dark:border-slate-800 space-y-4 animate-fade-in text-left">
+                              {lesson.content && (
+                                <Card className="border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs rounded-2xl overflow-hidden">
+                                  <CardHeader className="pb-2.5 pt-3.5 px-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+                                    <div className="flex items-center gap-2">
+                                      <div className="p-1 bg-[#0F4C81]/10 text-[#0F4C81] dark:bg-sky-950/40 dark:text-sky-400 rounded-md">
+                                        <BookOpen className="h-3.5 w-3.5" />
+                                      </div>
+                                      <div>
+                                        <CardTitle className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                                          Key Concepts & Topics
+                                        </CardTitle>
+                                      </div>
+                                    </div>
+                                  </CardHeader>
+                                  <CardContent className="p-4">
+                                    <ul className="space-y-2 text-xs leading-relaxed text-slate-650 dark:text-slate-350 list-none pl-0">
+                                      {getBulletPoints(lesson.content).map((pt, pIdx) => (
+                                        <li key={pIdx} className="flex items-start gap-2">
+                                          <span className="text-[#0F4C81] dark:text-sky-400 font-extrabold select-none mt-0.5">•</span>
+                                          <span className="flex-1">
+                                            <strong className="text-slate-850 dark:text-white font-black">{pt.bold}</strong> {pt.text}
+                                          </span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </CardContent>
+                                </Card>
+                              )}
                               {lesson.videoUrl && (
                                 <VideoPlayer url={lesson.videoUrl} lessonId={lesson.id} onPlayOrWatched={() => {
                                   if (!watchedVideos[lesson.id]) {
@@ -1277,9 +1392,6 @@ export const InternDashboard: React.FC = () => {
                                     });
                                   }
                                 }} />
-                              )}
-                              {lesson.content && (
-                                <div className="text-sm leading-relaxed text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-700 whitespace-pre-wrap">{lesson.content}</div>
                               )}
                               {lesson.attachmentUrl && (
                                 <div className="flex items-center gap-3 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -1702,6 +1814,46 @@ export const InternDashboard: React.FC = () => {
 
             {mySubmissions[selectedAssignment.id]?.status !== 'GRADED' && (
               <>
+                {mySubmissions[selectedAssignment.id] && (
+                  <div className="p-3 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 rounded-lg text-xs flex items-center justify-between mb-4">
+                    <div className="min-w-0 flex-1 text-left">
+                      <span className="font-bold block mb-1">Attached Project File:</span>
+                      <a
+                        href={mySubmissions[selectedAssignment.id].fileUrl || '#'}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline font-semibold break-all text-left"
+                      >
+                        {mySubmissions[selectedAssignment.id].fileName || 'View uploaded file'}
+                      </a>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="bg-red-600 hover:bg-red-700 text-white text-[10px] h-7 px-2.5 rounded-lg flex items-center gap-1.5 shrink-0 ml-2"
+                      onClick={async () => {
+                        if (confirm('Are you sure you want to delete this uploaded project file? This will permanently delete the file record and physical file.')) {
+                          try {
+                            await submissionService.delete(mySubmissions[selectedAssignment.id].id);
+                            setMySubmissions(prev => {
+                              const next = { ...prev };
+                              delete next[selectedAssignment.id];
+                              return next;
+                            });
+                            setSubmitFile('');
+                            setSubmitFileName('');
+                            toast.success('Project deleted successfully.');
+                          } catch (err: any) {
+                            toast.error(err.response?.data?.message || 'Failed to delete project.');
+                          }
+                        }
+                      }}
+                    >
+                      Delete Project
+                    </Button>
+                  </div>
+                )}
+
                 <Textarea
                   label="Submission Text / Answers"
                   placeholder="Paste code snippet or answers here..."

@@ -344,11 +344,11 @@ export class UsersService {
     };
   }
 
-  async getInternsMonitoring(projectCoordinatorId: string) {
+  async getInternsMonitoring(projectCoordinatorId: string, allDomains = false) {
     const projectCoordinator = await this.prisma.user.findUnique({
       where: { id: projectCoordinatorId },
     });
-    if (!projectCoordinator || projectCoordinator.role !== Role.PROJECT_COORDINATOR || !projectCoordinator.domain) {
+    if (!projectCoordinator || projectCoordinator.role !== Role.PROJECT_COORDINATOR) {
       return [];
     }
 
@@ -358,10 +358,14 @@ export class UsersService {
     const interns = await this.prisma.user.findMany({
       where: {
         role: Role.INTERN,
-        domain: {
-          equals: domain,
-          mode: 'insensitive',
-        },
+        ...(allDomains
+          ? {}
+          : {
+              domain: {
+                equals: domain,
+                mode: 'insensitive',
+              },
+            }),
       },
       select: {
         id: true,

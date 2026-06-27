@@ -171,9 +171,10 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  sizeClassName?: string;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, sizeClassName }) => {
   if (!isOpen) return null;
 
   return createPortal(
@@ -183,8 +184,8 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
 
       {/* Modal Dialog Content */}
       <div 
-        className="relative w-full max-w-lg rounded-xl border border-border bg-card shadow-lg glow-indigo animate-fade-in z-10 flex flex-col overflow-hidden"
-        style={{ maxHeight: '80vh' }}
+        className={`relative w-full ${sizeClassName || 'max-w-lg'} rounded-xl border border-border bg-card shadow-lg glow-indigo animate-fade-in z-10 flex flex-col overflow-hidden`}
+        style={{ maxHeight: '90vh' }}
       >
         {/* Sticky Header */}
         <div className="flex items-center justify-between border-b border-border/50 p-6 pb-3 flex-shrink-0 bg-[#ffffff] dark:bg-card sticky top-0 z-20">

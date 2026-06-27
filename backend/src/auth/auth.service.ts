@@ -33,6 +33,31 @@ export class AuthService {
       throw new ConflictException('User email already exists');
     }
 
+    let normalizedDomain = domain ? domain.trim() : 'Full Stack';
+    if (/^(gen\s*ai|generative\s*ai)$/i.test(normalizedDomain)) {
+      normalizedDomain = 'Generative AI';
+    } else if (/^(full\s*stack)$/i.test(normalizedDomain)) {
+      normalizedDomain = 'Full Stack';
+    } else if (/^(data\s*science)$/i.test(normalizedDomain)) {
+      normalizedDomain = 'Data Science';
+    } else if (/^(machine\s*learning)$/i.test(normalizedDomain)) {
+      normalizedDomain = 'Machine Learning';
+    } else if (/^(cyber\s*security)$/i.test(normalizedDomain)) {
+      normalizedDomain = 'Cyber Security';
+    } else if (/^(digital\s*marketing)$/i.test(normalizedDomain)) {
+      normalizedDomain = 'Digital Marketing';
+    }
+
+    const activeDomain = await this.prisma.domain.findFirst({
+      where: {
+        name: {
+          equals: normalizedDomain,
+          mode: 'insensitive',
+        },
+      },
+    });
+    const finalDomain = activeDomain ? activeDomain.name : normalizedDomain;
+
     const defaultPassword = password || 'welcome123';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
@@ -41,7 +66,7 @@ export class AuthService {
         name,
         email,
         role: role, // Support both INTERN and PROJECT_COORDINATOR
-        domain: domain || 'Full Stack',
+        domain: finalDomain,
         password: hashedPassword,
         isApproved: role === Role.PROJECT_COORDINATOR ? true : false, // Project coordinators approved by default, Interns require admin approval
       },

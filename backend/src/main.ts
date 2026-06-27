@@ -10,7 +10,6 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.use(cookieParser());
-  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
 
   app.enableCors({
     origin: (origin: any, callback: any) => {

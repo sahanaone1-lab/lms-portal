@@ -147,6 +147,11 @@ model Submission {
   createdAt      DateTime         @default(now())
   gradedAt       DateTime?
   isApproved     Boolean          @default(false)
+
+  // New fields
+  fileName       String?
+  courseId       String?
+  moduleId       String?
 }
 
 model Quiz {

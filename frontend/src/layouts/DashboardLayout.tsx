@@ -87,6 +87,44 @@ export const DashboardLayout: React.FC = () => {
     }
   };
 
+  const handleNotificationClick = (notif: any) => {
+    // 1. Mark as read if not already read
+    if (!notif.read) {
+      markAsRead(notif.id);
+    }
+
+    // 2. Close the notification dropdown
+    setIsNotifOpen(false);
+
+    // 3. Route to respective page based on notification details or user role
+    const title = (notif.title || '').toLowerCase();
+    const userRole = user?.role;
+
+    if (userRole === 'PROJECT_COORDINATOR') {
+      if (title.includes('submission') || title.includes('assignment') || title.includes('graded')) {
+        navigate('/project-coordinator/grading');
+      } else if (title.includes('certificate') || title.includes('claim') || title.includes('request')) {
+        navigate('/project-coordinator/certificates');
+      } else {
+        navigate('/project-coordinator');
+      }
+    } else if (userRole === 'ADMIN') {
+      if (title.includes('certificate') || title.includes('request')) {
+        navigate('/admin/projects');
+      } else {
+        navigate('/admin');
+      }
+    } else if (userRole === 'INTERN') {
+      if (title.includes('certificate')) {
+        navigate('/intern/certificates');
+      } else if (title.includes('graded') || title.includes('assignment')) {
+        navigate('/intern/enrolled');
+      } else {
+        navigate('/intern');
+      }
+    }
+  };
+
   const markAllAsRead = async () => {
     try {
       await notificationService.markAllRead();
@@ -113,7 +151,7 @@ export const DashboardLayout: React.FC = () => {
     { title: 'Domain Management', path: '/admin/domains', icon: Grid, roles: ['ADMIN'] },
     { title: 'Presentation Registration', path: '/admin/projects', icon: Briefcase, roles: ['ADMIN'] },
     { title: 'My Courses', path: '/project-coordinator/courses', icon: BookOpen, roles: ['PROJECT_COORDINATOR'] },
-    { title: 'Grading Portal', path: '/project-coordinator/grading', icon: FileCheck, roles: ['PROJECT_COORDINATOR'] },
+    { title: 'Grades', path: '/project-coordinator/grading', icon: FileCheck, roles: ['PROJECT_COORDINATOR'] },
     { title: 'Presentation Registration', path: '/project-coordinator/projects', icon: Briefcase, roles: ['PROJECT_COORDINATOR'] },
     { title: 'Certificate Requests', path: '/project-coordinator/certificates', icon: Award, roles: ['PROJECT_COORDINATOR'] },
     { title: 'Domains', path: '/project-coordinator/domains', icon: Grid, roles: ['PROJECT_COORDINATOR'] },
@@ -162,7 +200,7 @@ export const DashboardLayout: React.FC = () => {
       case '/project-coordinator/courses':
         return 'My Courses';
       case '/project-coordinator/grading':
-        return 'Grading Portal';
+        return 'Grades';
       case '/project-coordinator/projects':
         return 'Presentation Registration';
       case '/project-coordinator/domains':
@@ -211,11 +249,19 @@ export const DashboardLayout: React.FC = () => {
       {/* ── Sidebar ── */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-[#0b1a2e] border-r border-slate-100 dark:border-slate-800/80 flex flex-col transition-transform duration-300 ease-in-out shadow-lg md:shadow-none md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
 
-        {/* Logo Header */}
+        {/* Logo Header - Zoomed CS Logo Icon + Career Solutions Stacked Text */}
         <div className="flex items-center justify-between h-24 px-5 border-b border-slate-100 dark:border-slate-800/80 flex-shrink-0">
-          <Link to="/" className="flex items-center justify-center w-full min-w-0">
-            <div className="dark-logo-wrapper h-16 flex-shrink-0">
-              <img src="/logo.png" alt="Career Solutions Logo" />
+          <Link to="/" className="flex items-center gap-3.5 w-full min-w-0">
+            <div className="dark-logo-wrapper square-logo h-18 w-18 rounded-2xl flex-shrink-0 overflow-hidden flex items-center justify-center">
+              <img src="/logo.png" alt="CS Logo" className="h-full w-full object-contain scale-110" />
+            </div>
+            <div className="flex flex-col text-left leading-none select-none gap-1">
+              <span className="text-[19px] font-black font-display text-slate-800 dark:text-white tracking-widest uppercase">
+                Career
+              </span>
+              <span className="text-[13px] font-black font-display text-[#0F4C81] dark:text-blue-400 tracking-widest uppercase">
+                Solutions
+              </span>
             </div>
           </Link>
           <button
@@ -238,11 +284,10 @@ export const DashboardLayout: React.FC = () => {
                 key={item.path}
                 to={item.path}
                 onClick={() => setIsSidebarOpen(false)}
-                className={`group flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-medium transition-all duration-200 relative border-l-[3px] ${
-                  isActive
+                className={`group flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-medium transition-all duration-200 relative border-l-[3px] ${isActive
                     ? 'bg-[#EAF4F8] dark:bg-[#0F4C81]/15 text-[#0F4C81] dark:text-blue-400 font-semibold border-[#0F4C81] dark:border-blue-400 pl-[9px]'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-200 border-transparent pl-[9px]'
-                }`}
+                  }`}
               >
                 <Icon className={`h-[18px] w-[18px] flex-shrink-0 transition-colors ${isActive ? 'text-[#0F4C81] dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`} />
                 <span className="truncate">{item.title}</span>
@@ -287,24 +332,21 @@ export const DashboardLayout: React.FC = () => {
 
         {/* Top Header */}
         <header className="h-24 md:h-26 flex items-center justify-between px-4 md:px-8 bg-white dark:bg-[#0b1a2e] border-b border-slate-100 dark:border-slate-800/80 z-20 flex-shrink-0 shadow-sm transition-all duration-200">
-          {/* Left: Mobile menu + breadcrumb */}
-          <div className="flex items-center gap-4">
+          {/* Left Side: Mobile Menu Trigger only */}
+          <div className="flex items-center">
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="md:hidden p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
             >
               <Menu className="h-6 w-6" />
             </button>
-            {/* Responsive logo & title matching the screenshot on all screens */}
-            <div className="flex items-center">
-              <div className="dark-logo-wrapper h-12 md:h-16 flex-shrink-0">
-                <img src="/logo.png" alt="Career Solutions" />
-              </div>
-              <div className="h-8 md:h-12 w-px bg-slate-200 dark:bg-slate-700 mx-3 md:mx-6" />
-              <span className="text-base md:text-2xl font-bold font-display text-[#0c3d6e] dark:text-blue-300 truncate max-w-[180px] sm:max-w-none">
-                {currentPageTitle}
-              </span>
-            </div>
+          </div>
+
+          {/* Center: Current Page Title in a larger, bold font aligned vertically */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center pointer-events-none select-none">
+            <span className="text-lg md:text-3xl font-black font-display text-[#0c3d6e] dark:text-blue-300 tracking-tight uppercase truncate max-w-[200px] sm:max-w-xs md:max-w-md lg:max-w-none">
+              {currentPageTitle}
+            </span>
           </div>
           {/* Right: Actions */}
           <div className="flex items-center gap-1.5">
@@ -358,7 +400,7 @@ export const DashboardLayout: React.FC = () => {
                         notifications.map((notif) => (
                           <div
                             key={notif.id}
-                            onClick={() => { if (!notif.read) markAsRead(notif.id); }}
+                            onClick={() => handleNotificationClick(notif)}
                             className={`px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${!notif.read ? 'bg-blue-50/60 dark:bg-blue-950/20' : ''}`}
                           >
                             <div className="flex items-start gap-2.5">

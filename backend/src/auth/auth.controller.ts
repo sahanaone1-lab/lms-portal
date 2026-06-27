@@ -35,6 +35,13 @@ export class AuthController {
     const identifier = body.email || body.username;
     const data = await this.authService.login(identifier, body.password);
 
+    res.cookie('accessToken', data.accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000, // 15 mins
+    });
+
     res.cookie('refreshToken', data.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -52,6 +59,7 @@ export class AuthController {
   @Post('logout')
   async logout(@Req() req: any, @Res({ passthrough: true }) res: any) {
     await this.authService.logout(req.user.id);
+    res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
     return { message: 'Logged out successfully' };
   }
@@ -74,6 +82,13 @@ export class AuthController {
         refreshToken,
       );
 
+      res.cookie('accessToken', data.accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 15 * 60 * 1000,
+      });
+
       res.cookie('refreshToken', data.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -86,6 +101,7 @@ export class AuthController {
         user: data.user,
       };
     } catch (err) {
+      res.clearCookie('accessToken');
       res.clearCookie('refreshToken');
       throw new UnauthorizedException('Invalid or expired refresh token');
     }

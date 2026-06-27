@@ -127,6 +127,10 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
   const [selectedReportProgress, setSelectedReportProgress] = useState<any>(null);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [internsMonitoring, setInternsMonitoring] = useState<any[]>([]);
+  const [activeGradesTab, setActiveGradesTab] = useState<'progress' | 'submissions'>('progress');
+  const [activeDetailDomain, setActiveDetailDomain] = useState<string | null>(null);
+  const [projectSearchTerm, setProjectSearchTerm] = useState('');
+  const [projectStatusFilter, setProjectStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
 
   const loadProjectCoordinatorData = async () => {
     try {
@@ -141,7 +145,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       const myGrading = await submissionService.getProjectCoordinatorSubmissions();
       const usersData = await userService.getAll().catch(() => []);
       const myCertRequests = await certificateService.getProjectCoordinatorRequests().catch(() => []);
-      const monitoringData = await userService.getInternsMonitoring().catch(() => []);
+      const monitoringData = await userService.getInternsMonitoring(true).catch(() => []);
       const activeDomains = await domainService.getAll().catch(() => []);
       const projectsData = await projectService.getAll().catch(() => []);
 
@@ -1911,71 +1915,381 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     );
   };
 
+  const renderFilePreview = (fileUrl: string | null | undefined) => {
+    if (!fileUrl) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full p-8 border border-dashed border-slate-200 rounded-xl bg-slate-50 text-center">
+          <FileText className="h-10 w-10 text-slate-400 mb-2 mx-auto" />
+          <p className="text-xs text-slate-500 italic">No file submission provided.</p>
+        </div>
+      );
+    }
+    const extension = fileUrl.split('.').pop()?.toLowerCase();
+    
+    if (extension === 'pdf') {
+      return (
+        <iframe
+          src={fileUrl}
+          className="w-full h-full min-h-[400px] rounded-lg border border-slate-200 shadow-inner"
+          title="PDF Preview"
+        />
+      );
+    } else if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(extension || '')) {
+      return (
+        <div className="flex items-center justify-center border border-slate-200 rounded-lg p-2 bg-slate-50 overflow-auto h-full min-h-[400px] max-h-[500px] w-full shadow-inner">
+          <img src={fileUrl} alt="Preview" className="max-w-full max-h-[450px] object-contain rounded" />
+        </div>
+      );
+    } else if (['txt', 'log', 'json', 'js', 'ts', 'html', 'css', 'md'].includes(extension || '')) {
+      return (
+        <iframe
+          src={fileUrl}
+          className="w-full h-full min-h-[400px] rounded-lg border border-slate-200 bg-slate-50 font-mono text-xs shadow-inner"
+          title="Text Preview"
+        />
+      );
+    } else {
+      return (
+        <div className="flex flex-col items-center justify-center h-full p-8 border border-dashed border-slate-200 bg-slate-50 rounded-xl space-y-4 text-center w-full min-h-[400px]">
+          <div className="p-3 bg-slate-100 rounded-full text-slate-500 mx-auto">
+            <FileText className="h-8 w-8" />
+          </div>
+          <div>
+            <h4 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">Preview Unavailable</h4>
+            <p className="text-[11px] text-slate-500 mt-1">Direct preview is not supported for .{extension} files.</p>
+          </div>
+          <a
+            href={fileUrl}
+            download
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-bold h-8 px-4 bg-[#0F4C81] text-white hover:bg-[#0F4C81]/90 shadow-sm transition-all cursor-pointer mx-auto"
+          >
+            Download File
+          </a>
+        </div>
+      );
+    }
+  };
+
   const renderGrading = () => {
+    const domainName = user?.domain || 'Not Assigned';
+    const domainInterns = internsMonitoring.filter((i: any) => i.domain?.toLowerCase() === domainName?.toLowerCase());
+    
+    const filteredInterns = domainInterns.filter(
+      u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (u.employeeId && u.employeeId.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        u.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const filteredSubmissions = submissions.filter((sub) => {
+      // 1. Filter by status
+      const mappedStatus = sub.status === 'PENDING' 
+        ? 'PENDING' 
+        : (sub.isApproved ? 'APPROVED' : 'REJECTED');
+      
+      if (projectStatusFilter !== 'ALL' && mappedStatus !== projectStatusFilter) {
+        return false;
+      }
+
+      // 2. Filter by search query (studentName, courseName, moduleName, assignmentTitle, or domain)
+      const query = projectSearchTerm.toLowerCase().trim();
+      if (!query) return true;
+
+      const studentName = (sub.studentName || '').toLowerCase();
+      const courseName = (sub.courseName || '').toLowerCase();
+      const courseDomain = (sub.courseDomain || '').toLowerCase();
+      const moduleName = (sub.moduleName || '').toLowerCase();
+      const title = (sub.assignmentTitle || '').toLowerCase();
+
+      return studentName.includes(query) ||
+             courseName.includes(query) ||
+             courseDomain.includes(query) ||
+             moduleName.includes(query) ||
+             title.includes(query);
+    });
+
     return (
       <div className="space-y-6 text-left animate-fade-in">
         <HeroBanner
-          title="Grading Assessment Portal"
+          title="Grades & Progress Console"
           subtitle="Grader Console"
-          description="Evaluate code, worksheets, and other submissions from interns."
+          description="Evaluate code submissions, monitor intern completion rates, and manage module progress audits."
           isCoordinator={true}
         />
 
-        <Card className="text-left">
-          <CardContent className="pt-6">
-            {submissions.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
-                <CheckCircle className="h-10 w-10 mx-auto text-emerald-500/50 mb-3" />
-                <p className="font-semibold text-sm">All caught up! No pending submissions.</p>
+        {/* Tab Selection */}
+        <div className="flex space-x-1 border-b border-slate-200/80 pb-px">
+          <button
+            onClick={() => setActiveGradesTab('progress')}
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px cursor-pointer ${
+              activeGradesTab === 'progress'
+                ? 'border-[#0F4C81] text-[#0F4C81]'
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Intern Progress Directory
+          </button>
+          <button
+            onClick={() => setActiveGradesTab('submissions')}
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px cursor-pointer ${
+              activeGradesTab === 'submissions'
+                ? 'border-[#0F4C81] text-[#0F4C81]'
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Project Submissions Review
+          </button>
+        </div>
+
+        {activeGradesTab === 'progress' ? (
+          <Card className="rounded-premium shadow-premium border border-slate-100 bg-white overflow-hidden">
+            <CardHeader className="pb-3 border-b border-slate-100/80 bg-slate-50/20">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <CardTitle className="text-sm font-bold font-display text-slate-800">
+                  {domainName} Division Interns
+                </CardTitle>
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search by name, employee ID, or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 h-9 text-xs border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg"
+                  />
+                </div>
               </div>
-            ) : (
+            </CardHeader>
+            <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-border text-muted-foreground text-xs uppercase tracking-wider font-semibold bg-secondary/20">
-                      <th className="p-4">Name</th>
-                      <th className="p-4">Assignment</th>
-                      <th className="p-4">Date Submitted</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4 text-right">Actions</th>
+                    <tr className="border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold bg-slate-50/50 sticky top-0">
+                      <th className="p-4">Intern Name</th>
+                      <th className="p-4">Employee ID</th>
+                      <th className="p-4">Email</th>
+                      <th className="p-4">Domain</th>
+                      <th className="p-4">Course Progress (%)</th>
+                      <th className="p-4 text-center">Modules Completed</th>
+                      <th className="p-4 text-center">Total Modules</th>
+                      <th className="p-4">Certificate Status</th>
+                      <th className="p-4">Last Activity</th>
+                      <th className="p-4 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {submissions.map((sub) => (
-                      <tr key={sub.id} className="hover:bg-secondary/15 transition-colors">
-                        <td className="p-4 font-semibold text-foreground">{sub.studentName}</td>
-                        <td className="p-4 text-muted-foreground">{sub.assignmentTitle}</td>
-                        <td className="p-4 text-xs text-muted-foreground">
-                          {new Date(sub.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="p-4">
-                          <Badge variant={sub.status === 'GRADED' ? 'success' : 'warning'}>
-                            {sub.status}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedSub(sub);
-                              setGrade(sub.grade?.toString() || '');
-                              setFeedback(sub.feedback || '');
-                              setIsApproved(sub.isApproved || false);
-                              setIsGradeModalOpen(true);
-                            }}
-                          >
-                            {sub.status === 'GRADED' ? 'Edit Grade' : 'Grade'}
-                          </Button>
+                  <tbody className="divide-y divide-slate-50">
+                    {filteredInterns.map((intern) => {
+                      const primary = intern.coursesProgress?.[0];
+                      const pct = intern.progressPercent || 0;
+                      const hasActiveCourse = !!primary;
+
+                      return (
+                        <tr key={intern.id} className="hover:bg-slate-50/40 transition-colors duration-150">
+                          <td className="p-4 font-semibold text-slate-800 text-sm">{intern.name}</td>
+                          <td className="p-4">
+                            <span className="font-mono font-bold text-slate-600 bg-slate-100/80 px-2 py-0.5 rounded text-[10px]">
+                              {intern.employeeId || 'N/A'}
+                            </span>
+                          </td>
+                          <td className="p-4 text-slate-500 font-medium">{intern.email}</td>
+                          <td className="p-4 text-slate-600 font-medium">{intern.domain}</td>
+                          <td className="p-4">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-20 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/50 flex-shrink-0">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ease-out ${getProgressColor(pct)}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="font-bold text-slate-700 min-w-[28px]">{pct}%</span>
+                            </div>
+                          </td>
+                          <td className="p-4 text-center font-bold text-slate-700">{intern.modulesCompletedCount || 0}</td>
+                          <td className="p-4 text-center font-semibold text-slate-500">{intern.totalModulesCount || 0}</td>
+                          <td className="p-4">
+                            <Badge
+                              variant={intern.certStatus === 'Issued' ? 'success' : 'outline'}
+                              className="font-bold text-[9px]"
+                            >
+                              {intern.certStatus}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-slate-500 whitespace-nowrap">{formatLastActivity(intern.lastActivity)}</td>
+                          <td className="p-4 text-right">
+                            {hasActiveCourse ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-[10px] h-7 px-3 border-slate-200 hover:border-primary hover:bg-primary hover:text-white rounded-lg transition-all duration-200 hover:scale-102 shadow-xs"
+                                onClick={() => handleTrackProgress(intern, primary)}
+                              >
+                                View Details
+                              </Button>
+                            ) : (
+                              <span className="text-slate-400 italic text-[10px]">No Course</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {filteredInterns.length === 0 && (
+                      <tr>
+                        <td colSpan={10} className="p-8 text-center text-slate-400 italic font-medium">
+                          No interns found matching the criteria in {domainName}.
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="rounded-premium shadow-premium border border-slate-100 bg-white overflow-hidden">
+            <CardHeader className="pb-3 border-b border-slate-100/80 bg-slate-50/20">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="text-left">
+                  <CardTitle className="text-sm font-bold font-display text-slate-800">Submitted Projects ({filteredSubmissions.length})</CardTitle>
+                  <CardDescription className="text-xs text-slate-400 mt-0.5">Manage intern evaluations, grades, and code submissions.</CardDescription>
+                </div>
+                
+                {/* Search and Filters row */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Search submissions..."
+                      value={projectSearchTerm}
+                      onChange={(e) => setProjectSearchTerm(e.target.value)}
+                      className="pl-9 h-9 text-xs border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg"
+                    />
+                  </div>
+
+                  <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50">
+                    {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((filter) => {
+                      const count = submissions.filter((s) => {
+                        if (filter === 'ALL') return true;
+                        const status = s.status === 'PENDING' ? 'PENDING' : (s.isApproved ? 'APPROVED' : 'REJECTED');
+                        return status === filter;
+                      }).length;
+
+                      return (
+                        <button
+                          key={filter}
+                          type="button"
+                          onClick={() => setProjectStatusFilter(filter)}
+                          className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                            projectStatusFilter === filter
+                              ? 'bg-white text-slate-800 shadow-xs'
+                              : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          {filter.charAt(0) + filter.slice(1).toLowerCase()} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {submissions.length === 0 ? (
+                <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl m-4">
+                  <CheckCircle className="h-10 w-10 mx-auto text-emerald-500/50 mb-3" />
+                  <p className="font-semibold text-sm">All caught up! No submissions found.</p>
+                </div>
+              ) : filteredSubmissions.length === 0 ? (
+                <div className="p-12 text-center text-muted-foreground m-4 border border-dashed rounded-xl">
+                  <Search className="h-10 w-10 mx-auto text-slate-400/50 mb-3" />
+                  <p className="font-semibold text-sm">No submissions match the filter/search criteria.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold bg-slate-50/50 sticky top-0">
+                        <th className="p-4">Student Name</th>
+                        <th className="p-4">Domain</th>
+                        <th className="p-4">Course</th>
+                        <th className="p-4">Module</th>
+                        <th className="p-4">Project Title</th>
+                        <th className="p-4">Submission Date & Time</th>
+                        <th className="p-4 text-center">Status</th>
+                        <th className="p-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredSubmissions.map((sub) => {
+                        const statusLabel = sub.status === 'PENDING' 
+                          ? 'Pending' 
+                          : (sub.isApproved ? 'Approved' : 'Rejected');
+                        
+                        const statusColor = statusLabel === 'Approved'
+                          ? 'success'
+                          : (statusLabel === 'Rejected' ? 'destructive' : 'warning');
+
+                        return (
+                          <tr key={sub.id} className="hover:bg-slate-50/40 transition-colors duration-150">
+                            <td className="p-4 font-semibold text-slate-800 text-sm">{sub.studentName}</td>
+                            <td className="p-4">
+                              <Badge variant="outline" className="text-[10px] uppercase font-black bg-indigo-50/80 text-indigo-600 border-indigo-100/50">
+                                {sub.courseDomain || 'Full Stack'}
+                              </Badge>
+                            </td>
+                            <td className="p-4 text-slate-600 font-semibold max-w-[160px] truncate" title={sub.courseName}>
+                              {sub.courseName || 'N/A'}
+                            </td>
+                            <td className="p-4 text-slate-500 font-medium">{sub.moduleName || 'General'}</td>
+                            <td className="p-4 text-slate-600 font-medium max-w-[160px] truncate" title={sub.assignmentTitle}>
+                              {sub.assignmentTitle || 'N/A'}
+                            </td>
+                            <td className="p-4 text-slate-500 font-mono whitespace-nowrap">
+                              {new Date(sub.createdAt).toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </td>
+                            <td className="p-4 text-center">
+                              <Badge variant={statusColor} className="font-bold text-[9px] uppercase tracking-wide px-2 py-0.5">
+                                {statusLabel}
+                              </Badge>
+                            </td>
+                            <td className="p-4 text-right space-x-2 whitespace-nowrap">
+                              {sub.fileUrl && (
+                                <a
+                                  href={sub.fileUrl}
+                                  download
+                                  className="inline-flex items-center justify-center rounded-lg text-[10px] font-bold h-7 px-3 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all shadow-xs cursor-pointer"
+                                >
+                                  Download
+                                </a>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-[10px] h-7 px-3 border-slate-200 hover:border-primary hover:bg-primary hover:text-white rounded-lg transition-all shadow-xs font-bold"
+                                onClick={() => {
+                                  setSelectedSub(sub);
+                                  setGrade(sub.grade?.toString() || '');
+                                  setFeedback(sub.feedback || '');
+                                  setIsApproved(sub.isApproved !== false);
+                                  setIsGradeModalOpen(true);
+                                }}
+                              >
+                                View Project
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   };
@@ -2017,195 +2331,366 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
   };
 
   const renderDomains = () => {
-    const domainName = user?.domain || 'Not Assigned';
-    const domainInterns = internsMonitoring.filter((i: any) => i.domain?.toLowerCase() === domainName?.toLowerCase());
-    const totalDomainInterns = domainInterns.length;
-    const activeInterns = domainInterns.filter((i: any) => (i.coursesProgress || []).length > 0).length;
-    const domainCoursesCount = courses.length;
+    const mapDomainNameToDisplay = (dbName: string) => {
+      const name = dbName.toLowerCase().trim();
+      if (name === 'full-stack' || name === 'full stack') return 'Full Stack Development';
+      if (name === 'machine learning' || name === 'artificial intelligence' || name === 'ai') return 'Artificial Intelligence & Machine Learning';
+      if (name === 'data analytics' || name === 'data science') return 'Data Science';
+      return dbName;
+    };
 
-    // Average completion percentage
-    const allProgressPcts = domainInterns.flatMap((i: any) =>
-      (i.coursesProgress || []).map((cp: any) => cp.progressPercent || 0)
-    );
-    const avgCompletion = allProgressPcts.length > 0
-      ? Math.round(allProgressPcts.reduce((a: number, b: number) => a + b, 0) / allProgressPcts.length)
-      : 0;
+    const getDomainStats = (dbDomainName: string) => {
+      const domainInterns = internsMonitoring.filter(
+        (i: any) => i.domain?.toLowerCase() === dbDomainName.toLowerCase()
+      );
+      const domainCourses = allCoursesList.filter(
+        (c: any) => c.domain?.toLowerCase() === dbDomainName.toLowerCase()
+      );
+      
+      let totalModules = 0;
+      domainCourses.forEach((c: any) => {
+        const weeks = c.weeks || [];
+        totalModules += weeks.length;
+      });
 
-    // Completed certificates count for domain
-    const issuedCertsCount = domainInterns.reduce((acc: number, curr: any) => {
-      const issued = (curr.coursesProgress || []).filter((cp: any) => cp.certStatus === 'Issued').length;
-      return acc + issued;
-    }, 0);
+      const progressPcts = domainInterns.flatMap((i: any) =>
+        (i.coursesProgress || []).map((cp: any) => cp.progressPercent || 0)
+      );
+      
+      const avgProgress = progressPcts.length > 0
+        ? Math.round(progressPcts.reduce((a: number, b: number) => a + b, 0) / progressPcts.length)
+        : 0;
 
-    const filteredInterns = domainInterns.filter(
-      u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (u.employeeId && u.employeeId.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        u.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+      return {
+        totalInterns: domainInterns.length,
+        totalCourses: domainCourses.length,
+        totalModules,
+        avgProgress,
+      };
+    };
+
+    if (activeDetailDomain) {
+      const dbDomainName = activeDetailDomain;
+      const displayDomainName = mapDomainNameToDisplay(dbDomainName);
+      
+      const domainCourses = allCoursesList.filter(
+        (c: any) => c.domain?.toLowerCase() === dbDomainName.toLowerCase()
+      );
+      
+      const enrolledInterns = internsMonitoring.filter((intern: any) => {
+        if (intern.domain?.toLowerCase() === dbDomainName.toLowerCase()) return true;
+        return (intern.coursesProgress || []).some((cp: any) => {
+          const course = allCoursesList.find((c: any) => c.id === cp.courseId);
+          return course?.domain?.toLowerCase() === dbDomainName.toLowerCase();
+        });
+      });
+
+      let totalModules = 0;
+      domainCourses.forEach((c: any) => {
+        const weeks = c.weeks || [];
+        totalModules += weeks.length;
+      });
+
+      const progressPcts = enrolledInterns.flatMap((i: any) =>
+        (i.coursesProgress || []).map((cp: any) => cp.progressPercent || 0)
+      );
+      const avgProgress = progressPcts.length > 0
+        ? Math.round(progressPcts.reduce((a: number, b: number) => a + b, 0) / progressPcts.length)
+        : 0;
+
+      const filteredInterns = enrolledInterns.filter(
+        u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (u.employeeId && u.employeeId.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          u.email.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
+      return (
+        <div className="space-y-6 text-left animate-fade-in">
+          {/* Glassmorphic Domain Header */}
+          <div className="relative p-6 rounded-premium shadow-premium border border-slate-100/80 bg-white overflow-hidden flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActiveDetailDomain(null)}
+                  className="p-1 h-8 w-8 hover:bg-slate-100 rounded-lg flex items-center justify-center"
+                >
+                  <ChevronLeft className="h-5 w-5 text-slate-600" />
+                </Button>
+                <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider mb-0 bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20">
+                  Domain Details
+                </Badge>
+              </div>
+              <h2 className="text-2xl font-black text-slate-800 font-display pl-1">{displayDomainName}</h2>
+              <p className="text-xs text-slate-500 pl-1">Detailed view of curriculum, active courses, and enrolled interns.</p>
+            </div>
+          </div>
+
+          {/* Analytics Statistics Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 flex items-center space-x-3 rounded-premium shadow-premium bg-white border border-slate-100/80 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(13,161,181,0.05)] transition-all duration-300">
+              <div className="p-2.5 bg-[#0F4C81]/10 text-[#0F4C81] rounded-xl flex-shrink-0">
+                <Users className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">Total Interns</p>
+                <h3 className="text-xl font-black text-slate-800 mt-1">{enrolledInterns.length}</h3>
+              </div>
+            </div>
+
+            <div className="p-4 flex items-center space-x-3 rounded-premium shadow-premium bg-white border border-slate-100/80 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(13,161,181,0.05)] transition-all duration-300">
+              <div className="p-2.5 bg-[#0F4C81]/10 text-[#0F4C81] rounded-xl flex-shrink-0">
+                <BookOpen className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">Active Courses</p>
+                <h3 className="text-xl font-black text-slate-800 mt-1">{domainCourses.length}</h3>
+              </div>
+            </div>
+
+            <div className="p-4 flex items-center space-x-3 rounded-premium shadow-premium bg-white border border-slate-100/80 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(13,161,181,0.05)] transition-all duration-300">
+              <div className="p-2.5 bg-[#0F4C81]/10 text-[#0F4C81] rounded-xl flex-shrink-0">
+                <Layers className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">Total Modules</p>
+                <h3 className="text-xl font-black text-slate-800 mt-1">{totalModules}</h3>
+              </div>
+            </div>
+
+            <div className="p-4 flex items-center space-x-3 rounded-premium shadow-premium bg-white border border-slate-100/80 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(13,161,181,0.05)] transition-all duration-300">
+              <div className="p-2.5 bg-emerald-50 text-emerald-500 rounded-xl flex-shrink-0">
+                <CheckCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">Avg Progress</p>
+                <h3 className="text-xl font-black text-slate-800 mt-1">{avgProgress}%</h3>
+              </div>
+            </div>
+          </div>
+
+          {/* Courses List */}
+          <Card className="rounded-premium shadow-premium border border-slate-100 bg-white overflow-hidden">
+            <CardHeader className="pb-3 border-b border-slate-100/80 bg-slate-50/20">
+              <CardTitle className="text-sm font-bold font-display text-slate-800">Courses Available in Domain</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold bg-slate-50/50">
+                      <th className="p-4">Course Name</th>
+                      <th className="p-4">Category</th>
+                      <th className="p-4 text-center">Modules Count</th>
+                      <th className="p-4">Difficulty Level</th>
+                      <th className="p-4">Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {domainCourses.map((course) => (
+                      <tr key={course.id} className="hover:bg-slate-50/40 transition-colors">
+                        <td className="p-4 font-semibold text-slate-800 text-sm">{course.title}</td>
+                        <td className="p-4 text-slate-500 font-medium">{course.category || 'N/A'}</td>
+                        <td className="p-4 text-center font-bold text-slate-700">{(course.weeks as any[])?.length || 0}</td>
+                        <td className="p-4">
+                          <Badge variant="outline" className="font-bold text-[9px] uppercase">
+                            {course.difficulty || 'Beginner'}
+                          </Badge>
+                        </td>
+                        <td className="p-4 text-slate-500 font-semibold">{course.duration || 'N/A'}</td>
+                      </tr>
+                    ))}
+                    {domainCourses.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-6 text-center text-slate-400 italic">
+                          No courses available in this domain.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Interns Monitoring Card */}
+          <Card className="rounded-premium shadow-premium border border-slate-100 bg-white overflow-hidden">
+            <CardHeader className="pb-3 border-b border-slate-100/80 bg-slate-50/20">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <CardTitle className="text-sm font-bold font-display text-slate-800">Enrolled Interns ({filteredInterns.length})</CardTitle>
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search by name, employee ID, or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 h-9 text-xs border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold bg-slate-50/50">
+                      <th className="p-4">Intern Name</th>
+                      <th className="p-4">Employee ID</th>
+                      <th className="p-4">Email</th>
+                      <th className="p-4">Progress (%)</th>
+                      <th className="p-4 text-center">Modules Completed</th>
+                      <th className="p-4 text-center">Total Modules</th>
+                      <th className="p-4">Certificate Status</th>
+                      <th className="p-4">Last Activity</th>
+                      <th className="p-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filteredInterns.map((intern) => {
+                      const primary = intern.coursesProgress?.find((cp: any) => {
+                        const course = allCoursesList.find((c: any) => c.id === cp.courseId);
+                        return course?.domain?.toLowerCase() === dbDomainName.toLowerCase();
+                      }) || intern.coursesProgress?.[0];
+                      
+                      const pct = primary?.progressPercent || 0;
+                      const hasActiveCourse = !!primary;
+
+                      return (
+                        <tr key={intern.id} className="hover:bg-slate-50/40 transition-colors">
+                          <td className="p-4 font-semibold text-slate-800 text-sm">{intern.name}</td>
+                          <td className="p-4">
+                            <span className="font-mono font-bold text-slate-600 bg-slate-100/80 px-2 py-0.5 rounded text-[10px]">
+                              {intern.employeeId || 'N/A'}
+                            </span>
+                          </td>
+                          <td className="p-4 text-slate-500 font-medium">{intern.email}</td>
+                          <td className="p-4">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-20 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/50 flex-shrink-0">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ease-out ${getProgressColor(pct)}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="font-bold text-slate-700 min-w-[28px]">{pct}%</span>
+                            </div>
+                          </td>
+                          <td className="p-4 text-center font-bold text-slate-700">{primary?.modulesCompletedCount || 0}</td>
+                          <td className="p-4 text-center font-semibold text-slate-500">{primary?.totalModulesCount || 0}</td>
+                          <td className="p-4">
+                            <Badge
+                              variant={primary?.certStatus === 'Issued' ? 'success' : 'outline'}
+                              className="font-bold text-[9px]"
+                            >
+                              {primary?.certStatus || 'Not Claimed'}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-slate-500 whitespace-nowrap">{formatLastActivity(intern.lastActivity)}</td>
+                          <td className="p-4 text-right">
+                            {hasActiveCourse ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-[10px] h-7 px-3 border-slate-200 hover:border-primary hover:bg-primary hover:text-white rounded-lg transition-all shadow-xs"
+                                onClick={() => handleTrackProgress(intern, primary)}
+                              >
+                                View Details
+                              </Button>
+                            ) : (
+                              <span className="text-slate-400 italic text-[10px]">No Course</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {filteredInterns.length === 0 && (
+                      <tr>
+                        <td colSpan={9} className="p-8 text-center text-slate-400 italic">
+                          No interns enrolled in {displayDomainName}.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-6 text-left animate-fade-in">
-        {/* Glassmorphic Domain Header */}
         <HeroBanner
-          title={`Division: ${domainName}`}
-          subtitle="Managed Division"
-          description="Domain-scoped learner tracking, completion audits, and progress analytics."
+          title="All Career Solutions Domains"
+          subtitle="Curriculum Divisions"
+          description="Explore all domains available, view course curriculum counts, enrolled learners, and overall division performance metrics."
           isCoordinator={true}
         />
 
-        {/* Analytics Statistics Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          <div className="p-4 flex items-center space-x-3 rounded-premium shadow-premium bg-white border border-slate-100/80 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(13,161,181,0.1)] transition-all duration-300">
-            <div className="p-2.5 bg-[#0F4C81]/10 text-[#0F4C81] rounded-xl flex-shrink-0">
-              <Users className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">Total Interns</p>
-              <h3 className="text-xl font-black text-slate-800 mt-1">{totalDomainInterns}</h3>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {domains.map((domain) => {
+            const displayTitle = mapDomainNameToDisplay(domain.name);
+            const stats = getDomainStats(domain.name);
 
-          <div className="p-4 flex items-center space-x-3 rounded-premium shadow-premium bg-white border border-slate-100/80 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(13,161,181,0.1)] transition-all duration-300">
-            <div className="p-2.5 bg-[#0F4C81]/10 text-[#0F4C81] rounded-xl flex-shrink-0">
-              <Play className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">Active Learners</p>
-              <h3 className="text-xl font-black text-slate-800 mt-1">{activeInterns}</h3>
-            </div>
-          </div>
-
-          <div className="p-4 flex items-center space-x-3 rounded-premium shadow-premium bg-white border border-slate-100/80 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(13,161,181,0.1)] transition-all duration-300">
-            <div className="p-2.5 bg-[#0F4C81]/10 text-[#0F4C81] rounded-xl flex-shrink-0">
-              <BookOpen className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">Curriculum Tracks</p>
-              <h3 className="text-xl font-black text-slate-800 mt-1">{domainCoursesCount}</h3>
-            </div>
-          </div>
-
-          <div className="p-4 flex items-center space-x-3 rounded-premium shadow-premium bg-white border border-slate-100/80 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(13,161,181,0.1)] transition-all duration-300">
-            <div className="p-2.5 bg-emerald-50 text-emerald-500 rounded-xl flex-shrink-0">
-              <CheckCircle className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">Avg Progress</p>
-              <h3 className="text-xl font-black text-slate-800 mt-1">{avgCompletion}%</h3>
-            </div>
-          </div>
-
-          <div className="p-4 flex items-center space-x-3 rounded-premium shadow-premium bg-white border border-slate-100/80 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(13,161,181,0.1)] transition-all duration-300">
-            <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl flex-shrink-0">
-              <Award className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">Issued Credentials</p>
-              <h3 className="text-xl font-black text-slate-800 mt-1">{issuedCertsCount}</h3>
-            </div>
-          </div>
+            return (
+              <Card key={domain.id} className="rounded-premium shadow-premium border border-slate-100 hover:border-primary/20 hover:shadow-lg transition-all duration-300 overflow-hidden bg-white flex flex-col justify-between">
+                <CardHeader className="pb-4 flex flex-row items-start justify-between space-y-0">
+                  <div className="space-y-1.5 flex-1 pr-2 text-left">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={domain.isActive ? "success" : "outline"} className="text-[8px] uppercase tracking-wider font-extrabold px-1.5 py-0.5">
+                        {domain.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    <CardTitle className="text-base font-bold text-slate-800 font-display leading-tight">{displayTitle}</CardTitle>
+                    <p className="text-[11px] text-slate-400 leading-snug line-clamp-2 h-8">
+                      {domain.description || `Learning track for ${displayTitle}.`}
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 border border-slate-100/50 rounded-xl flex-shrink-0 shadow-inner">
+                    {getDomainIcon(domain.name)}
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-2 pb-5">
+                  <div className="grid grid-cols-2 gap-4 border-t border-b border-slate-50 py-3.5 my-1">
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none text-left">Total Interns</span>
+                      <span className="text-base font-extrabold text-slate-700 mt-1 block tabular-nums text-left">{stats.totalInterns}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none text-left">Courses</span>
+                      <span className="text-base font-extrabold text-slate-700 mt-1 block tabular-nums text-left">{stats.totalCourses}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none text-left">Modules</span>
+                      <span className="text-base font-extrabold text-slate-700 mt-1 block tabular-nums text-left">{stats.totalModules}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none text-left">Completion</span>
+                      <span className="text-base font-extrabold text-slate-700 mt-1 block tabular-nums text-left">{stats.avgProgress}%</span>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 flex items-center gap-2">
+                    <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-50">
+                      <div className={`h-full rounded-full transition-all duration-300 ${getProgressColor(stats.avgProgress)}`} style={{ width: `${stats.avgProgress}%` }} />
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500 tabular-nums">{stats.avgProgress}%</span>
+                  </div>
+                </CardContent>
+                <div className="px-6 pb-5 pt-0">
+                  <Button
+                    onClick={() => setActiveDetailDomain(domain.name)}
+                    className="w-full text-xs py-2 bg-[#0F4C81] text-white hover:bg-[#0F4C81]/90 rounded-lg flex items-center justify-center font-bold tracking-wide cursor-pointer transition-all shadow-xs"
+                  >
+                    View Details
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
         </div>
-
-        {/* Interns Monitoring Card */}
-        <Card className="rounded-premium shadow-premium border border-slate-100 bg-white overflow-hidden">
-          <CardHeader className="pb-3 border-b border-slate-100/80 bg-slate-50/20">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <CardTitle className="text-base font-bold font-display text-slate-800">Domain Interns Directory</CardTitle>
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Search by name, employee ID, or email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 h-9 text-xs border-slate-200 focus:border-primary focus:ring-1 focus:ring-primary rounded-lg"
-                />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold bg-slate-50/50 sticky top-0">
-                    <th className="p-4">Intern Name</th>
-                    <th className="p-4">Employee ID</th>
-                    <th className="p-4">Email</th>
-                    <th className="p-4">Domain</th>
-                    <th className="p-4">Course Progress (%)</th>
-                    <th className="p-4 text-center">Modules Completed</th>
-                    <th className="p-4 text-center">Total Modules</th>
-                    <th className="p-4">Certificate Status</th>
-                    <th className="p-4">Last Activity</th>
-                    <th className="p-4 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {filteredInterns.map((intern) => {
-                    const primary = intern.coursesProgress?.[0];
-                    const pct = intern.progressPercent || 0;
-                    const hasActiveCourse = !!primary;
-
-                    return (
-                      <tr key={intern.id} className="hover:bg-slate-50/40 transition-colors duration-150">
-                        <td className="p-4 font-semibold text-slate-800 text-sm">{intern.name}</td>
-                        <td className="p-4">
-                          <span className="font-mono font-bold text-slate-600 bg-slate-100/80 px-2 py-0.5 rounded text-[10px]">
-                            {intern.employeeId || 'N/A'}
-                          </span>
-                        </td>
-                        <td className="p-4 text-slate-500 font-medium">{intern.email}</td>
-                        <td className="p-4 text-slate-600 font-medium">{intern.domain}</td>
-                        <td className="p-4">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-20 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/50 flex-shrink-0">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ease-out ${getProgressColor(pct)}`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                            <span className="font-bold text-slate-700 min-w-[28px]">{pct}%</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-center font-bold text-slate-700">{intern.modulesCompletedCount || 0}</td>
-                        <td className="p-4 text-center font-semibold text-slate-500">{intern.totalModulesCount || 0}</td>
-                        <td className="p-4">
-                          <Badge
-                            variant={intern.certStatus === 'Issued' ? 'success' : 'outline'}
-                            className="font-bold text-[9px]"
-                          >
-                            {intern.certStatus}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-slate-500 whitespace-nowrap">{formatLastActivity(intern.lastActivity)}</td>
-                        <td className="p-4 text-right">
-                          {hasActiveCourse ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-[10px] h-7 px-3 border-slate-200 hover:border-primary hover:bg-primary hover:text-white rounded-lg transition-all duration-200 hover:scale-102 shadow-xs"
-                              onClick={() => handleTrackProgress(intern, primary)}
-                            >
-                              View Details
-                            </Button>
-                          ) : (
-                            <span className="text-slate-400 italic text-[10px]">No Course</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {filteredInterns.length === 0 && (
-                    <tr>
-                      <td colSpan={10} className="p-8 text-center text-slate-400 italic font-medium">
-                        No interns found matching the criteria in {domainName}.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
   };
@@ -2935,46 +3420,150 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       </Modal>
 
       {/* Modal: Grading Tool */}
-      <Modal isOpen={isGradeModalOpen} onClose={() => setIsGradeModalOpen(false)} title="Evaluate Submission">
+      <Modal isOpen={isGradeModalOpen} onClose={() => setIsGradeModalOpen(false)} title="Evaluate Project Submission" sizeClassName="max-w-6xl w-full">
         {selectedSub && (
-          <form onSubmit={handleGradeSubmission} className="space-y-4">
-            <div className="p-4 border border-border/80 rounded-lg bg-secondary/10">
-              <p className="text-xs text-muted-foreground font-semibold">Student: {selectedSub.studentName}</p>
-              <p className="text-sm font-semibold mt-1">Assignment: {selectedSub.assignmentTitle}</p>
-              <div className="mt-3 text-xs bg-background p-3 rounded-lg border border-border overflow-x-auto whitespace-pre-wrap font-mono">
-                {selectedSub.submissionText || 'No text content provided.'}
-              </div>
-              {selectedSub.fileUrl && (
-                <div className="mt-2 text-xs">
-                  <span className="text-muted-foreground">Attachment: </span>
-                  <a href={selectedSub.fileUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline font-semibold">
-                    Open Submitted File
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
+            {/* Left Column: Interactive File Preview */}
+            <div className="flex flex-col h-[60vh] bg-slate-50 border border-slate-200/80 rounded-xl overflow-hidden p-1 shadow-inner">
+              <div className="px-3 py-2 bg-white border-b border-slate-100 flex items-center justify-between text-xs font-bold text-slate-700">
+                <span className="truncate">File Preview: {selectedSub.projectFileName || 'Document'}</span>
+                {selectedSub.fileUrl && (
+                  <a
+                    href={selectedSub.fileUrl}
+                    download
+                    className="inline-flex items-center gap-1 hover:text-primary transition-colors cursor-pointer text-slate-500 font-semibold"
+                  >
+                    Download Original
                   </a>
+                )}
+              </div>
+              <div className="flex-1 overflow-auto bg-slate-100 flex items-center justify-center p-2 min-h-[350px]">
+                {renderFilePreview(selectedSub.fileUrl)}
+              </div>
+            </div>
+
+            {/* Right Column: Project details and grading inputs */}
+            <form onSubmit={handleGradeSubmission} className="flex flex-col justify-between h-[60vh] space-y-4">
+              <div className="space-y-4 overflow-y-auto pr-1 flex-1">
+                {/* Project Details */}
+                <div className="p-4 bg-slate-50/50 rounded-xl border border-slate-100 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className="text-[10px] uppercase font-black bg-primary/5 text-primary border-primary/20">
+                      Project Metadata
+                    </Badge>
+                    <span className="text-[10px] font-mono text-slate-400 font-bold">
+                      Submitted: {new Date(selectedSub.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="text-left">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none">Student Name</span>
+                      <span className="font-semibold text-slate-800 mt-1 block">{selectedSub.studentName}</span>
+                    </div>
+                    <div className="text-left">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none">Email Address</span>
+                      <span className="font-semibold text-slate-800 mt-1 block truncate" title={selectedSub.studentEmail}>{selectedSub.studentEmail || 'N/A'}</span>
+                    </div>
+                    <div className="col-span-2 text-left">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none">Course Curriculum</span>
+                      <span className="font-bold text-[#0F4C81] mt-1 block">{selectedSub.courseName || 'N/A'}</span>
+                    </div>
+                    <div className="text-left">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none">Module Section</span>
+                      <span className="font-semibold text-slate-600 mt-1 block">{selectedSub.moduleName || 'General'}</span>
+                    </div>
+                    <div className="text-left">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none">Project Title</span>
+                      <span className="font-semibold text-slate-600 mt-1 block">{selectedSub.assignmentTitle || 'N/A'}</span>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            <Input label="Assign Score (0-100)" type="number" min="0" max="100" value={grade} onChange={(e) => setGrade(e.target.value)} />
-            <Textarea label="Feedback & Remarks" placeholder="Helpful corrections or details..." value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+                {/* Project Description / Instructions */}
+                {selectedSub.assignmentInstruction && (
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Project Requirements / Instructions</label>
+                    <div className="max-h-32 overflow-y-auto bg-slate-50 border border-slate-100 p-3 rounded-lg text-xs leading-relaxed text-slate-650 whitespace-pre-wrap">
+                      {selectedSub.assignmentInstruction}
+                    </div>
+                  </div>
+                )}
 
-            <div className="flex items-center space-x-2 py-2">
-              <input
-                type="checkbox"
-                id="isApproved"
-                checked={isApproved}
-                onChange={(e) => setIsApproved(e.target.checked)}
-                className="h-4 w-4 text-primary border-border rounded"
-              />
-              <label htmlFor="isApproved" className="text-xs font-semibold text-muted-foreground uppercase select-none">
-                Approve Project Submission
-              </label>
-            </div>
+                {/* Submitted text content if any */}
+                {selectedSub.submissionText && (
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Submission Comments / Notes</label>
+                    <div className="max-h-32 overflow-y-auto bg-slate-50 border border-slate-100 p-3 rounded-lg text-xs leading-relaxed text-slate-700 whitespace-pre-wrap font-mono">
+                      {selectedSub.submissionText}
+                    </div>
+                  </div>
+                )}
 
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button variant="ghost" type="button" onClick={() => setIsGradeModalOpen(false)}>Cancel</Button>
-              <Button type="submit">Publish Grade</Button>
-            </div>
-          </form>
+                {/* Evaluation Inputs */}
+                <Input
+                  label="Assign Project Marks (0 - 100)"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={grade}
+                  onChange={(e) => setGrade(e.target.value)}
+                  required
+                />
+
+                <Textarea
+                  label="Provide Written Feedback & Corrections"
+                  placeholder="Give helpful critiques, points of improvement, and highlight successful portions..."
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  required
+                  rows={4}
+                />
+
+                <div className="space-y-1.5 text-left">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Evaluation Outcome</label>
+                  <div className="flex items-center space-x-6 py-3 bg-slate-50 px-4 rounded-xl border border-slate-100">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="statusApproved"
+                        name="evaluationStatus"
+                        checked={isApproved === true}
+                        onChange={() => setIsApproved(true)}
+                        className="h-4 w-4 text-[#0F4C81] border-slate-300 focus:ring-[#0F4C81]"
+                      />
+                      <label htmlFor="statusApproved" className="text-xs font-bold text-emerald-600 uppercase select-none cursor-pointer">
+                        Approve Project ✅
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="statusRejected"
+                        name="evaluationStatus"
+                        checked={isApproved === false}
+                        onChange={() => setIsApproved(false)}
+                        className="h-4 w-4 text-[#0F4C81] border-slate-300 focus:ring-[#0F4C81]"
+                      />
+                      <label htmlFor="statusRejected" className="text-xs font-bold text-rose-600 uppercase select-none cursor-pointer">
+                        Reject Project ❌
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Save Actions */}
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 flex-shrink-0 bg-white">
+                <Button variant="ghost" type="button" onClick={() => setIsGradeModalOpen(false)} className="text-xs h-9 px-4">
+                  Cancel
+                </Button>
+                <Button type="submit" className="text-xs h-9 px-4 bg-[#0F4C81] text-white hover:bg-[#0F4C81]/90">
+                  Save Evaluation
+                </Button>
+              </div>
+            </form>
+          </div>
         )}
       </Modal>
 

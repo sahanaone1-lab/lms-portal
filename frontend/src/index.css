@@ -420,6 +420,11 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
 }
 
+/* Symmetric padding for square logo wraps */
+.dark .dark-logo-wrapper.square-logo {
+  padding: 0.3rem !important;
+}
+
 /* Ensure the image inside fills the height, scales width, and zooms in Dark Mode */
 .dark-logo-wrapper img {
   height: 100% !important;
@@ -430,6 +435,10 @@
 
 .dark .dark-logo-wrapper img {
   transform: scale(1.18) !important; /* Zoom/scale the logo to occupy most of the container */
+}
+
+.dark .dark-logo-wrapper.square-logo img {
+  transform: scale(1.1) !important; /* Avoid clipping edges for square logo box */
 }
 
 /* Responsive Table layout adjustments to prevent screen overflows */

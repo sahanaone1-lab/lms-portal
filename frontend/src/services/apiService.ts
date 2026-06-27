@@ -74,8 +74,8 @@ export const userService = {
     return res.data;
   },
 
-  getInternsMonitoring: async (): Promise<any[]> => {
-    const res = await api.get('/users/interns-monitoring');
+  getInternsMonitoring: async (allDomains = false): Promise<any[]> => {
+    const res = await api.get(`/users/interns-monitoring${allDomains ? '?all=true' : ''}`);
     return res.data;
   },
 };
@@ -233,7 +233,7 @@ export const submissionService = {
 
   submit: async (
     assignmentId: string,
-    data: { submissionText?: string; fileUrl?: string },
+    data: { submissionText?: string; fileUrl?: string; fileName?: string },
   ): Promise<Submission> => {
     const res = await api.post('/submissions', { assignmentId, ...data });
     return res.data;
@@ -247,9 +247,10 @@ export const submissionService = {
     return res.data;
   },
 
-  upload: async (file: File): Promise<{ fileUrl: string; originalName: string }> => {
+  upload: async (file: File, assignmentId: string): Promise<{ fileUrl: string; originalName: string; submission: Submission }> => {
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('assignmentId', assignmentId);
     const res = await api.post('/submissions/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -257,9 +258,12 @@ export const submissionService = {
     });
     return res.data;
   },
-};
 
-// ---------------------------------------------------------------------------
+  delete: async (id: string): Promise<{ success: boolean }> => {
+    const res = await api.delete(`/submissions/${id}`);
+    return res.data;
+  },
+};// ---------------------------------------------------------------------------
 // Quizzes
 // ---------------------------------------------------------------------------
 export const quizService = {
