@@ -1,0 +1,259 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+enum Role {
+  ADMIN
+  PROJECT_COORDINATOR
+  INTERN
+}
+
+enum SubmissionStatus {
+  PENDING
+  GRADED
+}
+
+model User {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  password     String
+  name         String
+  role         Role           @default(INTERN)
+  domain             String?
+  employeeId         String?        @unique
+  username           String?        @unique
+  phone              String?
+  dob                DateTime?
+  department         String?
+  designation        String?
+  collegeName        String?
+  batch              String?
+  mustChangePassword Boolean        @default(false)
+  isApproved         Boolean        @default(true)
+  refreshToken       String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  
+  // Relations
+  createdCourses Course[]      @relation("CreatedCourses")
+  createdProjects Project[]     @relation("CreatedProjects")
+  projectRegistrations ProjectRegistration[]
+  enrollments    Enrollment[]
+  submissions    Submission[]
+  quizResults    QuizResult[]
+  certificates   Certificate[]
+  notifications  Notification[]
+  lessonProgress LessonProgress[]
+  certificateRequests CertificateRequest[]
+
+  @@map("users")
+}
+
+model Course {
+  id               String         @id @default(uuid())
+  title            String
+  description      String
+  domain           String         @default("Full Stack")
+  coverImage       String?
+  projectCoordinatorId     String         @map("project_coordinator_id")
+  projectCoordinator       User           @relation("CreatedCourses", fields: [projectCoordinatorId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  // Extended metadata (stored as JSON or plain strings)
+  weeks            Json?          // Array of { id, number, title } — module/week structure
+  status           String?        @default("Draft")  // Draft | Published | Archived
+  difficulty       String?        @default("Beginner")
+  duration         String?        // e.g. "120 Hours"
+  category         String?
+  learningOutcomes Json?          // Array of strings
+  brochureUrl      String?
+  brochureName     String?
+  brochureFileName String?
+  brochureMimeType String?
+  uploadedBy       String?
+  uploadedAt       DateTime?
+
+  // Relations
+  lessons          Lesson[]
+  assignments      Assignment[]
+  quizzes          Quiz[]
+  enrollments      Enrollment[]
+  certificates     Certificate[]
+  certificateRequests CertificateRequest[]
+
+  @@map("courses")
+}
+
+model Enrollment {
+  id        String   @id @default(uuid())
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  enrolledAt DateTime @default(now())
+
+  @@unique([studentId, courseId])
+}
+
+model Lesson {
+  id            String   @id @default(uuid())
+  title         String
+  content       String
+  videoUrl      String?
+  attachmentUrl String?
+  pdfResource   String?
+  duration      String?
+  order         Int
+  weekId        String?  // references the module/week id within the course.weeks JSON
+  courseId      String
+  course        Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt     DateTime         @default(now())
+  progress      LessonProgress[]
+}
+
+model Assignment {
+  id             String       @id @default(uuid())
+  title          String
+  instruction    String
+  attachmentUrl  String?
+  dueDate        DateTime
+  maxMarks       Int?         @default(100)
+  submissionType String?      @default("File Upload")
+  submissionRules String?
+  weekId         String?      // references the module/week id within the course.weeks JSON
+  courseId       String
+  course         Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  submissions    Submission[]
+}
+
+model Submission {
+  id             String           @id @default(uuid())
+  submissionText String?
+  fileUrl        String?
+  grade          Int?
+  feedback       String?
+  status         SubmissionStatus @default(PENDING)
+  studentId      String
+  student        User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assignmentId   String
+  assignment     Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+  gradedAt       DateTime?
+  isApproved     Boolean          @default(false)
+}
+
+model Quiz {
+  id           String       @id @default(uuid())
+  title        String
+  passingScore Int          @default(70)
+  timeLimit    Int?         @default(30)
+  weekId       String?      // references the module/week id within the course.weeks JSON
+  courseId     String
+  course       Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions    Json         // Array of question objects: { id, text, options: string[], correctOption: number }
+  createdAt    DateTime     @default(now())
+  results      QuizResult[]
+}
+
+model QuizResult {
+  id        String   @id @default(uuid())
+  score     Int
+  passed    Boolean
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  quizId    String
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Certificate {
+  id              String   @id @default(uuid())
+  certificateCode String   @unique
+  studentId       String
+  student         User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId        String
+  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  issuedAt        DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Domain {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LessonProgress {
+  id           String   @id @default(uuid())
+  studentId    String
+  student      User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lessonId     String
+  lesson       Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  completed    Boolean  @default(true)
+  videoWatched Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@unique([studentId, lessonId])
+}
+
+enum CertificateRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CertificateRequest {
+  id        String                   @id @default(uuid())
+  studentId String
+  student   User                     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course                   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  status    CertificateRequestStatus @default(PENDING)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  @@unique([studentId, courseId])
+}
+
+model Project {
+  id           String   @id @default(uuid())
+  title        String
+  description  String
+  projectCoordinatorId String   @map("project_coordinator_id")
+  projectCoordinator   User     @relation("CreatedProjects", fields: [projectCoordinatorId], references: [id], onDelete: Cascade)
+  domain       String
+  registrations ProjectRegistration[]
+
+  @@map("projects")
+}
+
+model ProjectRegistration {
+  id           String   @id @default(uuid())
+  projectId    String   @map("project_id")
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  internId     String   @map("intern_id")
+  intern       User     @relation(fields: [internId], references: [id], onDelete: Cascade)
+  registeredAt DateTime @default(now()) @map("registered_at")
+
+  @@unique([projectId, internId])
+  @@map("project_registrations")
+}

@@ -1,0 +1,449 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+/* Enable class-based dark mode (Tailwind v4) */
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  --color-border: hsl(213 20% 88%);
+  --color-input: hsl(213 20% 88%);
+  --color-ring: hsl(213 74% 28%);
+  --color-background: hsl(210 40% 98%);
+  --color-foreground: hsl(213 50% 10%);
+
+  /* Career Solutions Brand Colors */
+  --cs-navy: #0F4C81;
+  --cs-blue: #1B6CA8;
+  --cs-teal: #17A2B8;
+  --cs-light: #EAF4F8;
+  --cs-bg: #F8FAFC;
+
+  --color-primary: hsl(213 74% 28%);
+  --color-primary-foreground: hsl(210 20% 98%);
+
+  --color-secondary: hsl(213 30% 95%);
+  --color-secondary-foreground: hsl(213 50% 20%);
+
+  --color-destructive: hsl(0 84.2% 60.2%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+
+  --color-muted: hsl(213 20% 94%);
+  --color-muted-foreground: hsl(213 20% 45%);
+
+  --color-accent: hsl(197 74% 94%);
+  --color-accent-foreground: hsl(213 74% 22%);
+
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(213 50% 10%);
+
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(213 50% 10%);
+
+  --radius-lg: 0.75rem;
+  --radius-md: calc(0.75rem - 2px);
+  --radius-sm: calc(0.75rem - 4px);
+  --radius-premium: 16px;
+
+  --shadow-premium: 0 4px 24px rgba(15, 76, 129, 0.08);
+  --shadow-card: 0 1px 4px rgba(15, 76, 129, 0.06), 0 4px 16px rgba(15, 76, 129, 0.06);
+}
+
+/* Dark mode overrides (standard media-based dark mode or class-based) */
+.dark {
+  --color-border: hsl(213 20% 18%);
+  --color-input: hsl(213 20% 18%);
+  --color-ring: hsl(213 60% 55%);
+  --color-background: hsl(213 30% 6%);
+  --color-foreground: hsl(210 20% 96%);
+
+  --color-primary: hsl(213 60% 55%);
+  --color-primary-foreground: hsl(210 20% 98%);
+
+  --color-secondary: hsl(213 20% 14%);
+  --color-secondary-foreground: hsl(210 20% 96%);
+
+  --color-destructive: hsl(0 62.8% 40%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+
+  --color-muted: hsl(213 20% 16%);
+  --color-muted-foreground: hsl(213 15% 55%);
+
+  --color-accent: hsl(213 50% 18%);
+  --color-accent-foreground: hsl(213 60% 75%);
+
+  --color-popover: hsl(213 30% 8%);
+  --color-popover-foreground: hsl(210 20% 96%);
+
+  --color-card: hsl(213 28% 9%);
+  --color-card-foreground: hsl(210 20% 96%);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-foreground);
+}
+
+/* Card details & premium glassmorphism classes */
+.glassmorphism {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.dark .glassmorphism {
+  background: rgba(10, 20, 35, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glow-navy {
+  box-shadow: 0 0 40px -10px rgba(15, 76, 129, 0.20);
+}
+
+/* Legacy alias */
+.glow-indigo {
+  box-shadow: 0 0 40px -10px rgba(15, 76, 129, 0.20);
+}
+
+/* Premium card hover */
+.card-hover {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.card-hover:hover {
+  box-shadow: 0 8px 30px rgba(15, 76, 129, 0.12);
+  transform: translateY(-2px);
+}
+
+/* Skeleton loading animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f4f8 25%, #e2eaf3 50%, #f0f4f8 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+.dark .skeleton {
+  background: linear-gradient(90deg, #0f1f35 25%, #162540 50%, #0f1f35 75%);
+  background-size: 200% 100%;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Animated corporate theme classes */
+
+/* Floating animations */
+@keyframes floatUp {
+
+  0%,
+  100% {
+    transform: translateY(0px) rotate(3deg);
+  }
+
+  50% {
+    transform: translateY(-12px) rotate(4deg);
+  }
+}
+
+@keyframes floatDown {
+
+  0%,
+  100% {
+    transform: translateY(0px) rotate(-3deg);
+  }
+
+  50% {
+    transform: translateY(12px) rotate(-4deg);
+  }
+}
+
+@keyframes floatLeft {
+
+  0%,
+  100% {
+    transform: translateY(0px) rotate(1deg);
+  }
+
+  50% {
+    transform: translateY(-8px) rotate(-1deg);
+  }
+}
+
+@keyframes floatRight {
+
+  0%,
+  100% {
+    transform: translateY(0px) rotate(-2deg);
+  }
+
+  50% {
+    transform: translateY(8px) rotate(0deg);
+  }
+}
+
+.animate-float-up {
+  animation: floatUp 8s ease-in-out infinite;
+}
+
+.animate-float-down {
+  animation: floatDown 9s ease-in-out infinite;
+}
+
+.animate-float-left {
+  animation: floatLeft 10s ease-in-out infinite;
+}
+
+.animate-float-right {
+  animation: floatRight 11s ease-in-out infinite;
+}
+
+/* Pulsing background glow */
+@keyframes glowPulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.15;
+  }
+
+  50% {
+    transform: scale(1.15);
+    opacity: 0.25;
+  }
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 12s ease-in-out infinite;
+}
+
+/* Moving gradient light background */
+@keyframes gradientBg {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-flow {
+  background-size: 200% 200%;
+  animation: gradientBg 15s ease infinite;
+}
+
+/* Particle animation keyframe */
+@keyframes particleRise {
+  0% {
+    transform: translateY(100px) scale(0.8);
+    opacity: 0;
+  }
+
+  10%,
+  90% {
+    opacity: 0.45;
+  }
+
+  100% {
+    transform: translateY(-200px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+.animate-particle {
+  animation: particleRise 14s linear infinite;
+}
+
+/* Auto-sliding vertical carousel */
+@keyframes verticalSlide {
+
+  0%,
+  15% {
+    transform: translateY(0);
+  }
+
+  20%,
+  35% {
+    transform: translateY(-236px);
+  }
+
+  40%,
+  55% {
+    transform: translateY(-472px);
+  }
+
+  60%,
+  75% {
+    transform: translateY(-708px);
+  }
+
+  80%,
+  95% {
+    transform: translateY(-944px);
+  }
+
+  100% {
+    transform: translateY(-1180px);
+  }
+}
+
+.animate-vertical-slide {
+  animation: verticalSlide 15s cubic-bezier(0.85, 0, 0.15, 1) infinite;
+}
+
+/* Background floating shapes */
+@keyframes floatShape1 {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+
+  33% {
+    transform: translate(30px, -50px) scale(1.15) rotate(120deg);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.95) rotate(240deg);
+  }
+}
+
+@keyframes floatShape2 {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+
+  50% {
+    transform: translate(-40px, 40px) scale(0.9) rotate(-180deg);
+  }
+}
+
+.animate-shape-1 {
+  animation: floatShape1 20s ease-in-out infinite;
+}
+
+.animate-shape-2 {
+  animation: floatShape2 25s ease-in-out infinite;
+}
+
+/* Premium Sticky Modal Footer Styling */
+.modal-content-container .flex.justify-end {
+  position: sticky;
+  bottom: -24px; /* matches bottom padding of .modal-content-container */
+  margin-bottom: -24px;
+  margin-top: 16px;
+  padding-top: 16px;
+  padding-bottom: 24px;
+  background-color: var(--color-card);
+  margin-left: -24px;
+  margin-right: -24px;
+  padding-left: 24px;
+  padding-right: 24px;
+  z-index: 10;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Logo retains original colors in all themes - no filter applied */
+
+/* --- UI/UX Improvements CSS Customizations --- */
+
+/* Logo wrapper to handle Dark Mode white container/background */
+.dark-logo-wrapper {
+  transition: all 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+}
+
+.dark .dark-logo-wrapper {
+  background-color: #ffffff !important;
+  border-radius: 0.75rem !important; /* rounded-xl */
+  padding: 0.25rem 0.65rem !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Ensure the image inside fills the height, scales width, and zooms in Dark Mode */
+.dark-logo-wrapper img {
+  height: 100% !important;
+  width: auto !important;
+  object-fit: contain !important;
+  transition: transform 0.2s ease-in-out;
+}
+
+.dark .dark-logo-wrapper img {
+  transform: scale(1.18) !important; /* Zoom/scale the logo to occupy most of the container */
+}
+
+/* Responsive Table layout adjustments to prevent screen overflows */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* Ensure spacing remains consistent on mobile screens */
+@media (max-width: 640px) {
+  .p-5, .p-6 {
+    padding: 1rem !important;
+  }
+  .mb-6 {
+    margin-bottom: 1rem !important;
+  }
+}

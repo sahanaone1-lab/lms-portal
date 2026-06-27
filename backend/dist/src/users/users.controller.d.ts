@@ -1,0 +1,144 @@
+import { UsersService } from './users.service';
+export declare class UsersController {
+    private usersService;
+    constructor(usersService: UsersService);
+    getProfile(req: any): Promise<{
+        id: string;
+        email: string;
+        name: string;
+        role: import("@prisma/client").$Enums.Role;
+        domain: string | null;
+        employeeId: string | null;
+        username: string | null;
+        phone: string | null;
+        dob: Date | null;
+        department: string | null;
+        designation: string | null;
+        collegeName: string | null;
+        batch: string | null;
+        mustChangePassword: boolean;
+        isApproved: boolean;
+        createdAt: Date;
+    }>;
+    updateProfile(req: any, body: any): Promise<{
+        id: string;
+        email: string;
+        name: string;
+        role: import("@prisma/client").$Enums.Role;
+        domain: string | null;
+        employeeId: string | null;
+        username: string | null;
+        phone: string | null;
+        dob: Date | null;
+        department: string | null;
+        designation: string | null;
+        collegeName: string | null;
+        batch: string | null;
+        mustChangePassword: boolean;
+        isApproved: boolean;
+        createdAt: Date;
+    }>;
+    changePassword(req: any, body: any): Promise<void>;
+    getInternsMonitoring(req: any): Promise<{
+        id: string;
+        name: string;
+        employeeId: string;
+        domain: string | null;
+        email: string;
+        phone: string | null;
+        collegeName: string | null;
+        batch: string | null;
+        progressPercent: number;
+        modulesCompleted: string;
+        modulesCompletedCount: number;
+        totalModulesCount: number;
+        certStatus: string;
+        lastActivity: string;
+        coursesProgress: {
+            courseId: string;
+            courseTitle: string;
+            progressPercent: number;
+            modulesCompleted: string;
+            modulesCompletedCount: number;
+            totalModulesCount: number;
+            certStatus: string;
+            weeksList: {
+                id: any;
+                number: any;
+                title: any;
+                completed: boolean;
+            }[];
+            quizAverage: number;
+            totalAssignments: number;
+            assignmentsSubmitted: number;
+            attendance: number;
+        }[];
+    }[]>;
+    getSystemStats(): Promise<{
+        totalUsers: number;
+        totalCourses: number;
+        totalEnrollments: number;
+        completionRate: number;
+    }>;
+    getAll(): Promise<{
+        id: string;
+        email: string;
+        name: string;
+        role: import("@prisma/client").$Enums.Role;
+        domain: string | null;
+        employeeId: string | null;
+        username: string | null;
+        phone: string | null;
+        dob: Date | null;
+        department: string | null;
+        designation: string | null;
+        collegeName: string | null;
+        batch: string | null;
+        mustChangePassword: boolean;
+        isApproved: boolean;
+        createdAt: Date;
+    }[]>;
+    bulkCreate(body: any): Promise<{
+        created: any[];
+        errors: string[];
+    }>;
+    create(body: any): Promise<{
+        id: string;
+        email: string;
+        name: string;
+        role: import("@prisma/client").$Enums.Role;
+        domain: string | null;
+        employeeId: string | null;
+        username: string | null;
+        phone: string | null;
+        dob: Date | null;
+        department: string | null;
+        designation: string | null;
+        collegeName: string | null;
+        batch: string | null;
+        mustChangePassword: boolean;
+        isApproved: boolean;
+        createdAt: Date;
+    }>;
+    update(id: string, body: any): Promise<{
+        id: string;
+        email: string;
+        name: string;
+        role: import("@prisma/client").$Enums.Role;
+        domain: string | null;
+        employeeId: string | null;
+        username: string | null;
+        phone: string | null;
+        dob: Date | null;
+        department: string | null;
+        designation: string | null;
+        collegeName: string | null;
+        batch: string | null;
+        mustChangePassword: boolean;
+        isApproved: boolean;
+        createdAt: Date;
+    }>;
+    delete(id: string): Promise<{
+        success: boolean;
+    }>;
+}
