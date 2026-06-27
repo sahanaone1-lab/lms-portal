@@ -3,7 +3,7 @@
  * All data operations go through the real NestJS backend via HTTP.
  * No localStorage mock — all data is persisted in PostgreSQL.
  */
-import { api } from './api';
+import { api, API_URL } from './api';
 import { User, Course, Lesson, Assignment, Submission, Quiz, QuizResult, Certificate, Notification, Role, Domain, Project, ProjectRegistration } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -331,7 +331,7 @@ export const certificateService = {
   },
 
   downloadPdfUrl: (id: string): string => {
-    return `http://localhost:3000/certificates/${id}/pdf`;
+    return `${API_URL}/certificates/${id}/pdf`;
   },
 };
 

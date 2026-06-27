@@ -11,9 +11,16 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  const frontendUrl = process.env.FRONTEND_URL;
   app.enableCors({
     origin: (origin: any, callback: any) => {
-      if (!origin || origin.indexOf('localhost') !== -1 || origin.indexOf('127.0.0.1') !== -1 || origin.indexOf('[::1]') !== -1) {
+      if (
+        !origin ||
+        origin.indexOf('localhost') !== -1 ||
+        origin.indexOf('127.0.0.1') !== -1 ||
+        origin.indexOf('[::1]') !== -1 ||
+        (frontendUrl && origin === frontendUrl)
+      ) {
         callback(null, true);
       } else {
         callback(null, false);

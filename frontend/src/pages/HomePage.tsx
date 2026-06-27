@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_URL } from '../services/api';
 import {
   ChevronDown, ChevronUp, ArrowRight, Mail, Phone, MapPin,
   BarChart3, Code2, ShieldCheck, Megaphone, BrainCircuit,
@@ -358,7 +359,7 @@ export const HomePage: React.FC = () => {
 
   useEffect(() => {
     // Fetch brochures map from public API
-    axios.get('http://localhost:3000/public-courses/domain-brochures')
+    axios.get(`${API_URL}/public-courses/domain-brochures`)
       .then(res => {
         setDomainBrochures(res.data);
       })
