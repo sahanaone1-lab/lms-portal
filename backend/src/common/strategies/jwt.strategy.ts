@@ -10,7 +10,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
         (req: any) => {
-          return req?.cookies?.accessToken || null;
+          return req?.cookies?.accessToken || req?.query?.token || null;
         },
       ]),
       ignoreExpiration: false,

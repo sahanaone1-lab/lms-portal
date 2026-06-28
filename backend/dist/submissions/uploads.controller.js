@@ -45,14 +45,29 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UploadsController = void 0;
+exports.UploadsController = exports.UploadsAuthGuard = void 0;
 const common_1 = require("@nestjs/common");
-const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
+const passport_1 = require("@nestjs/passport");
 const prisma_service_1 = require("../prisma/prisma.service");
 const express = __importStar(require("express"));
 const path_1 = require("path");
 const fs = __importStar(require("fs"));
 const client_1 = require("@prisma/client");
+let UploadsAuthGuard = class UploadsAuthGuard extends (0, passport_1.AuthGuard)('jwt') {
+    canActivate(context) {
+        const request = context.switchToHttp().getRequest();
+        const filename = request.params.filename;
+        // If the file is a public brochure (does not start with 'file-')
+        if (filename && !filename.startsWith('file-')) {
+            return true; // Bypass authentication
+        }
+        return super.canActivate(context);
+    }
+};
+exports.UploadsAuthGuard = UploadsAuthGuard;
+exports.UploadsAuthGuard = UploadsAuthGuard = __decorate([
+    (0, common_1.Injectable)()
+], UploadsAuthGuard);
 let UploadsController = class UploadsController {
     constructor(prisma) {
         this.prisma = prisma;
@@ -65,6 +80,9 @@ let UploadsController = class UploadsController {
         const user = req.user;
         // If it is a project file
         if (filename.startsWith('file-')) {
+            if (!user) {
+                throw new common_1.ForbiddenException('Authentication required for this file');
+            }
             const submission = await this.prisma.submission.findFirst({
                 where: {
                     fileUrl: {
@@ -96,13 +114,14 @@ let UploadsController = class UploadsController {
                 }
             }
         }
+        res.setHeader('Content-Disposition', 'inline');
         return res.sendFile(filePath);
     }
 };
 exports.UploadsController = UploadsController;
 __decorate([
     (0, common_1.Get)(':filename'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(UploadsAuthGuard),
     __param(0, (0, common_1.Param)('filename')),
     __param(1, (0, common_1.Req)()),
     __param(2, (0, common_1.Res)()),

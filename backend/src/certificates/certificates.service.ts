@@ -231,6 +231,8 @@ export class CertificatesService {
         userId: req.studentId,
         title: 'Certificate Approved! 🎓',
         message: `Congratulations! Your certificate request for "${req.course.title}" has been approved. You can now download it.`,
+        type: 'certificate_approved',
+        entityId: req.courseId,
       },
     }).catch(() => {});
 
@@ -261,6 +263,8 @@ export class CertificatesService {
         userId: req.studentId,
         title: 'Certificate Request Rejected ❌',
         message: `Your certificate request for "${req.course.title}" was rejected. Please review completion criteria and try again.`,
+        type: 'certificate_rejected',
+        entityId: req.courseId,
       },
     }).catch(() => {});
 

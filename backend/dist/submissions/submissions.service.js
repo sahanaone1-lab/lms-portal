@@ -109,6 +109,8 @@ let SubmissionsService = class SubmissionsService {
                 userId: assignment.course.projectCoordinatorId,
                 title: 'New Assignment Submission',
                 message: `A student submitted answers for assignment "${assignment.title}".`,
+                type: 'assignment_submitted',
+                entityId: submission.id,
             },
         })
             .catch(() => { });
@@ -279,6 +281,8 @@ let SubmissionsService = class SubmissionsService {
                 userId: submission.studentId,
                 title: 'Assignment Graded',
                 message: `Your submission for "${submission.assignment.title}" has been graded: ${grade}/100.`,
+                type: 'assignment_graded',
+                entityId: submission.id,
             },
         })
             .catch(() => { });

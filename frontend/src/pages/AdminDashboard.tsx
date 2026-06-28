@@ -8,6 +8,7 @@ import { VideoPlayer } from '../components/VideoPlayer';
 import { User, Course, Role, Lesson, Assignment, Quiz, Question, Domain, Project, ProjectRegistration } from '../types';
 import { Users, BookOpen, GraduationCap, Award, Plus, Trash2, Edit2, ShieldAlert, ListTodo, FileCheck, Check, ChevronDown, ChevronUp, Play, FileText, HelpCircle, Edit, Trash, Eye, X, CheckCircle, Video, Briefcase, Upload, Grid } from 'lucide-react';
 import { HeroBanner } from '../components/HeroBanner';
+import { getAuthenticatedFileUrl } from '../services/api';
 
 export const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -28,10 +29,16 @@ export const AdminDashboard: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
 
-  // Modals state
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<User | null>(null);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
 
   // Create Course state
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
@@ -198,6 +205,26 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const editUserId = params.get('edit');
+    const courseId = params.get('id');
+
+    if (editUserId && users.length > 0) {
+      const u = users.find(user => user.id === editUserId);
+      if (u) {
+        handleOpenEditModal(u);
+      }
+    }
+
+    if (courseId && courses.length > 0) {
+      const c = courses.find(course => course.id === courseId);
+      if (c) {
+        handleSelectCourse(c);
+      }
+    }
+  }, [location.search, users, courses]);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -532,15 +559,24 @@ export const AdminDashboard: React.FC = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleDeleteCourse = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this course? All associated lessons, quizzes, and certificates will be removed.')) return;
-    try {
-      await courseService.delete(id);
-      setCourses(prev => prev.filter(c => c.id !== id));
-      alert('Course successfully removed');
-    } catch (err) {
-      alert('Failed to delete course');
-    }
+  const handleDeleteCourse = (id: string) => {
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Course',
+      message: 'Are you sure you want to delete this course? All associated lessons, quizzes, and certificates will be removed.',
+      onConfirm: async () => {
+        try {
+          await courseService.delete(id);
+          setCourses(prev => prev.filter(c => c.id !== id));
+          toast.success('Course successfully removed');
+          if (selectedCourse?.id === id) {
+            setSelectedCourse(null);
+          }
+        } catch (err: any) {
+          toast.error(err.message || 'Failed to delete course');
+        }
+      },
+    });
   };
 
   const handleSelectCourse = async (course: Course) => {
@@ -587,24 +623,29 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleBrochureDelete = async () => {
+  const handleBrochureDelete = () => {
     if (!selectedCourse) return;
-    if (!confirm('Are you sure you want to delete this course brochure?')) return;
-    
-    try {
-      await (courseService as any).deleteBrochure(selectedCourse.id);
-      toast.success('Brochure deleted successfully');
-      
-      // Update selected course details in UI
-      const detailed = await courseService.getById(selectedCourse.id);
-      setSelectedCourse(detailed);
-      
-      // Update in course list as well
-      setCourses(prev => prev.map(c => c.id === selectedCourse.id ? { ...c, ...detailed } : c));
-    } catch (err: any) {
-      console.error(err);
-      toast.error('Failed to delete brochure');
-    }
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Brochure',
+      message: 'Are you sure you want to delete this course brochure?',
+      onConfirm: async () => {
+        try {
+          await (courseService as any).deleteBrochure(selectedCourse.id);
+          toast.success('Brochure deleted successfully');
+          
+          // Update selected course details in UI
+          const detailed = await courseService.getById(selectedCourse.id);
+          setSelectedCourse(detailed);
+          
+          // Update in course list as well
+          setCourses(prev => prev.map(c => c.id === selectedCourse.id ? { ...c, ...detailed } : c));
+        } catch (err: any) {
+          console.error(err);
+          toast.error('Failed to delete brochure');
+        }
+      },
+    });
   };
 
   const handleEditCourse = async (e: React.FormEvent) => {
@@ -699,15 +740,22 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleToggleDomainActive = async (dom: Domain) => {
+  const handleToggleDomainActive = (dom: Domain) => {
     const action = dom.isActive ? 'disable' : 'enable';
-    if (!confirm(`Are you sure you want to ${action} the "${dom.name}" domain?`)) return;
-    try {
-      await domainService.update(dom.id, { isActive: !dom.isActive });
-      await loadData();
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to update domain status');
-    }
+    setDeleteConfirm({
+      show: true,
+      title: `${dom.isActive ? 'Disable' : 'Enable'} Domain`,
+      message: `Are you sure you want to ${action} the "${dom.name}" domain?`,
+      onConfirm: async () => {
+        try {
+          await domainService.update(dom.id, { isActive: !dom.isActive });
+          await loadData();
+          toast.success(`Domain ${action}d successfully`);
+        } catch (err: any) {
+          toast.error(err.response?.data?.message || 'Failed to update domain status');
+        }
+      },
+    });
   };
   // Helper methods for Course Builder
   const getCourseWeeks = (course: Course) => {
@@ -812,37 +860,47 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteWeek = async (weekId: string) => {
+  const handleDeleteWeek = (weekId: string) => {
     if (!selectedCourse) return;
-    if (confirm('Are you sure you want to delete this module? Lessons, quizzes, and assignments in this module will be reassigned to Module 1.')) {
-      const currentWeeks = getCourseWeeks(selectedCourse);
-      const filteredWeeks = currentWeeks.filter(w => w.id !== weekId);
-      const updatedWeeks = filteredWeeks.map((w, idx) => ({ ...w, number: idx + 1 }));
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Module',
+      message: 'Are you sure you want to delete this module? Lessons, quizzes, and assignments in this module will be reassigned to Module 1.',
+      onConfirm: async () => {
+        try {
+          const currentWeeks = getCourseWeeks(selectedCourse);
+          const filteredWeeks = currentWeeks.filter(w => w.id !== weekId);
+          const updatedWeeks = filteredWeeks.map((w, idx) => ({ ...w, number: idx + 1 }));
 
-      await courseService.update(selectedCourse.id, { weeks: updatedWeeks });
+          await courseService.update(selectedCourse.id, { weeks: updatedWeeks });
 
-      const firstWeekId = updatedWeeks[0]?.id || 'w_default';
-      const lessons = selectedCourse.lessons || [];
-      for (const l of lessons) {
-        if (l.weekId === weekId) {
-          await lessonService.update(l.id, { weekId: firstWeekId });
-        }
-      }
-      const assignments = selectedCourse.assignments || [];
-      for (const a of assignments) {
-        if (a.weekId === weekId) {
-          await assignmentService.update(a.id, { weekId: firstWeekId });
-        }
-      }
-      const quizzes = selectedCourse.quizzes || [];
-      for (const q of quizzes) {
-        if (q.weekId === weekId) {
-          await quizService.update(q.id, { weekId: firstWeekId });
-        }
-      }
+          const firstWeekId = updatedWeeks[0]?.id || 'w_default';
+          const lessons = selectedCourse.lessons || [];
+          for (const l of lessons) {
+            if (l.weekId === weekId) {
+              await lessonService.update(l.id, { weekId: firstWeekId });
+            }
+          }
+          const assignments = selectedCourse.assignments || [];
+          for (const a of assignments) {
+            if (a.weekId === weekId) {
+              await assignmentService.update(a.id, { weekId: firstWeekId });
+            }
+          }
+          const quizzes = selectedCourse.quizzes || [];
+          for (const q of quizzes) {
+            if (q.weekId === weekId) {
+              await quizService.update(q.id, { weekId: firstWeekId });
+            }
+          }
 
-      handleSelectCourse(selectedCourse);
-    }
+          toast.success('Module successfully deleted');
+          handleSelectCourse(selectedCourse);
+        } catch (err: any) {
+          toast.error('Failed to delete module');
+        }
+      },
+    });
   };
 
   const handleSaveLesson = async (e: React.FormEvent) => {
@@ -900,11 +958,21 @@ export const AdminDashboard: React.FC = () => {
     setIsLessonModalOpen(true);
   };
 
-  const handleDeleteLesson = async (id: string) => {
-    if (confirm('Are you sure you want to delete this lesson?')) {
-      await lessonService.delete(id);
-      if (selectedCourse) handleSelectCourse(selectedCourse);
-    }
+  const handleDeleteLesson = (id: string) => {
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Lesson',
+      message: 'Are you sure you want to delete this lesson?',
+      onConfirm: async () => {
+        try {
+          await lessonService.delete(id);
+          toast.success('Lesson deleted successfully');
+          if (selectedCourse) handleSelectCourse(selectedCourse);
+        } catch (err: any) {
+          toast.error('Failed to delete lesson');
+        }
+      },
+    });
   };
 
   const handlePreviewLesson = (les: Lesson) => {
@@ -970,11 +1038,21 @@ export const AdminDashboard: React.FC = () => {
     setIsAssignmentModalOpen(true);
   };
 
-  const handleDeleteAssignment = async (id: string) => {
-    if (confirm('Are you sure you want to delete this assignment?')) {
-      await assignmentService.delete(id);
-      if (selectedCourse) handleSelectCourse(selectedCourse);
-    }
+  const handleDeleteAssignment = (id: string) => {
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Assignment',
+      message: 'Are you sure you want to delete this assignment?',
+      onConfirm: async () => {
+        try {
+          await assignmentService.delete(id);
+          toast.success('Assignment deleted successfully');
+          if (selectedCourse) handleSelectCourse(selectedCourse);
+        } catch (err: any) {
+          toast.error('Failed to delete assignment');
+        }
+      },
+    });
   };
 
   const handleSaveQuiz = async (e: React.FormEvent) => {
@@ -1052,11 +1130,21 @@ export const AdminDashboard: React.FC = () => {
     setIsQuizModalOpen(true);
   };
 
-  const handleDeleteQuiz = async (id: string) => {
-    if (confirm('Are you sure you want to delete this quiz?')) {
-      await quizService.delete(id);
-      if (selectedCourse) handleSelectCourse(selectedCourse);
-    }
+  const handleDeleteQuiz = (id: string) => {
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Quiz',
+      message: 'Are you sure you want to delete this quiz?',
+      onConfirm: async () => {
+        try {
+          await quizService.delete(id);
+          toast.success('Quiz deleted successfully');
+          if (selectedCourse) handleSelectCourse(selectedCourse);
+        } catch (err: any) {
+          toast.error('Failed to delete quiz');
+        }
+      },
+    });
   };
 
   const handlePreviewQuiz = (qz: Quiz) => {
@@ -2224,6 +2312,34 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Modal: Confirm Delete General */}
+      {deleteConfirm && (
+        <Modal
+          isOpen={deleteConfirm.show}
+          onClose={() => setDeleteConfirm(null)}
+          title={deleteConfirm.title}
+        >
+          <div className="p-6 space-y-4 text-left">
+            <p className="text-sm text-foreground">{deleteConfirm.message}</p>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  const onConfirm = deleteConfirm.onConfirm;
+                  setDeleteConfirm(null);
+                  await onConfirm();
+                }}
+              >
+                Confirm Delete
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Modal: Add User */}
       <Modal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} title="Add Corporate Directory Member">

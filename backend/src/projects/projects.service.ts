@@ -148,15 +148,29 @@ export class ProjectsService {
     }
 
     // Create registration
-    return this.prisma.projectRegistration.create({
+    const registration = await this.prisma.projectRegistration.create({
       data: {
         projectId,
         internId,
       },
       include: {
         project: true,
+        intern: true,
       },
     });
+
+    // Notify the project coordinator
+    await this.prisma.notification.create({
+      data: {
+        userId: registration.project.projectCoordinatorId,
+        title: 'Project Assigned',
+        message: `Intern "${registration.intern.name}" has registered for your project "${registration.project.title}".`,
+        type: 'project_assigned',
+        entityId: projectId,
+      },
+    }).catch(() => {});
+
+    return registration;
   }
 
   async remove(id: string, userId: string, role: Role) {

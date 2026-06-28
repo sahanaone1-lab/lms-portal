@@ -34,6 +34,18 @@ export const setAccessToken = (token: string | null) => {
   tokenStore = token;
 };
 
+export const getAccessToken = () => tokenStore;
+
+export const getAuthenticatedFileUrl = (url: string | null | undefined): string => {
+  if (!url) return '';
+  const token = getAccessToken();
+  if (token && (url.includes('/uploads/') || url.includes('/certificates/'))) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}token=${token}`;
+  }
+  return url;
+};
+
 // Request Interceptor: Attach access token
 api.interceptors.request.use(
   (config) => {

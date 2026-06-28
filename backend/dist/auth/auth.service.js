@@ -121,6 +121,21 @@ let AuthService = class AuthService {
                     },
                 }).catch(() => { });
             }
+            // Notify all admins of the new intern registration
+            const admins = await this.prisma.user.findMany({
+                where: { role: client_1.Role.ADMIN },
+            });
+            for (const admin of admins) {
+                await this.prisma.notification.create({
+                    data: {
+                        userId: admin.id,
+                        title: 'New Intern Registered',
+                        message: `A new intern "${user.name}" has registered and requires approval.`,
+                        type: 'new_intern',
+                        entityId: user.id,
+                    },
+                }).catch(() => { });
+            }
         }
         const { password: _, ...result } = user;
         return result;

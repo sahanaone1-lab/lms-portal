@@ -8,6 +8,7 @@ import { BookOpen, Plus, FileText, CheckCircle, Video, ListTodo, Award, Check, U
 
 import { useAuth } from '../store/AuthContext';
 import { HeroBanner } from '../components/HeroBanner';
+import { getAuthenticatedFileUrl } from '../services/api';
 
 interface CalendarEvent {
   id: string;
@@ -43,6 +44,13 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
   const [isWeekModalOpen, setIsWeekModalOpen] = useState(false);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
   const [isDomainModalOpen, setIsDomainModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
 
@@ -170,6 +178,27 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, [location.pathname]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const courseId = params.get('id');
+    const submissionId = params.get('submissionId');
+
+    if (courseId && courses.length > 0) {
+      const c = courses.find(course => course.id === courseId);
+      if (c) {
+        handleSelectCourse(c);
+      }
+    }
+
+    if (submissionId && submissions.length > 0) {
+      const s = submissions.find(sub => sub.id === submissionId);
+      if (s) {
+        setSelectedSub(s);
+        setIsGradeModalOpen(true);
+      }
+    }
+  }, [location.search, courses, submissions]);
+
   const getCourseWeeks = (course: Course) => {
     if (course.weeks && course.weeks.length > 0) {
       return course.weeks;
@@ -276,24 +305,29 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     }
   };
 
-  const handleBrochureDelete = async () => {
+  const handleBrochureDelete = () => {
     if (!selectedCourse) return;
-    if (!confirm('Are you sure you want to delete this course brochure?')) return;
-    
-    try {
-      await (courseService as any).deleteBrochure(selectedCourse.id);
-      toast.success('Brochure deleted successfully');
-      
-      // Update selected course details in UI
-      const detailed = await courseService.getById(selectedCourse.id);
-      setSelectedCourse(detailed);
-      
-      // Update in course list as well
-      setCourses(prev => prev.map(c => c.id === selectedCourse.id ? { ...c, ...detailed } : c));
-    } catch (err: any) {
-      console.error(err);
-      toast.error('Failed to delete brochure');
-    }
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Brochure',
+      message: 'Are you sure you want to delete this course brochure?',
+      onConfirm: async () => {
+        try {
+          await (courseService as any).deleteBrochure(selectedCourse.id);
+          toast.success('Brochure deleted successfully');
+          
+          // Update selected course details in UI
+          const detailed = await courseService.getById(selectedCourse.id);
+          setSelectedCourse(detailed);
+          
+          // Update in course list as well
+          setCourses(prev => prev.map(c => c.id === selectedCourse.id ? { ...c, ...detailed } : c));
+        } catch (err: any) {
+          console.error(err);
+          toast.error('Failed to delete brochure');
+        }
+      },
+    });
   };
 
 
@@ -397,17 +431,22 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteCourse = async (courseId: string) => {
-    if (confirm('Are you sure you want to delete this course? This action is permanent and will delete all associated lessons, assignments, and quizzes.')) {
-      try {
-        await courseService.delete(courseId);
-        await loadProjectCoordinatorData();
-        setSelectedCourse(null);
-        alert('Course deleted successfully!');
-      } catch (err) {
-        alert('Failed to delete course');
-      }
-    }
+  const handleDeleteCourse = (courseId: string) => {
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Course',
+      message: 'Are you sure you want to delete this course? This action is permanent and will delete all associated lessons, assignments, and quizzes.',
+      onConfirm: async () => {
+        try {
+          await courseService.delete(courseId);
+          await loadProjectCoordinatorData();
+          setSelectedCourse(null);
+          toast.success('Course deleted successfully!');
+        } catch (err) {
+          toast.error('Failed to delete course');
+        }
+      },
+    });
   };
 
   const handleSaveWeek = async (e: React.FormEvent) => {
@@ -440,37 +479,47 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteWeek = async (weekId: string) => {
+  const handleDeleteWeek = (weekId: string) => {
     if (!selectedCourse) return;
-    if (confirm('Are you sure you want to delete this module? Lessons, quizzes, and assignments in this module will be reassigned to Module 1.')) {
-      const currentWeeks = getCourseWeeks(selectedCourse);
-      const filteredWeeks = currentWeeks.filter(w => w.id !== weekId);
-      const updatedWeeks = filteredWeeks.map((w, idx) => ({ ...w, number: idx + 1 }));
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Module',
+      message: 'Are you sure you want to delete this module? Lessons, quizzes, and assignments in this module will be reassigned to Module 1.',
+      onConfirm: async () => {
+        try {
+          const currentWeeks = getCourseWeeks(selectedCourse);
+          const filteredWeeks = currentWeeks.filter(w => w.id !== weekId);
+          const updatedWeeks = filteredWeeks.map((w, idx) => ({ ...w, number: idx + 1 }));
 
-      await courseService.update(selectedCourse.id, { weeks: updatedWeeks });
+          await courseService.update(selectedCourse.id, { weeks: updatedWeeks });
 
-      const firstWeekId = updatedWeeks[0]?.id || 'w_default';
-      const lessons = selectedCourse.lessons || [];
-      for (const l of lessons) {
-        if (l.weekId === weekId) {
-          await lessonService.update(l.id, { weekId: firstWeekId });
-        }
-      }
-      const assignments = selectedCourse.assignments || [];
-      for (const a of assignments) {
-        if (a.weekId === weekId) {
-          await assignmentService.update(a.id, { weekId: firstWeekId });
-        }
-      }
-      const quizzes = selectedCourse.quizzes || [];
-      for (const q of quizzes) {
-        if (q.weekId === weekId) {
-          await quizService.update(q.id, { weekId: firstWeekId });
-        }
-      }
+          const firstWeekId = updatedWeeks[0]?.id || 'w_default';
+          const lessons = selectedCourse.lessons || [];
+          for (const l of lessons) {
+            if (l.weekId === weekId) {
+              await lessonService.update(l.id, { weekId: firstWeekId });
+            }
+          }
+          const assignments = selectedCourse.assignments || [];
+          for (const a of assignments) {
+            if (a.weekId === weekId) {
+              await assignmentService.update(a.id, { weekId: firstWeekId });
+            }
+          }
+          const quizzes = selectedCourse.quizzes || [];
+          for (const q of quizzes) {
+            if (q.weekId === weekId) {
+              await quizService.update(q.id, { weekId: firstWeekId });
+            }
+          }
 
-      handleSelectCourse(selectedCourse);
-    }
+          toast.success('Module successfully deleted');
+          handleSelectCourse(selectedCourse);
+        } catch (err: any) {
+          toast.error('Failed to delete module');
+        }
+      },
+    });
   };
 
   const handleSaveLesson = async (e: React.FormEvent) => {
@@ -528,11 +577,21 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     setIsLessonModalOpen(true);
   };
 
-  const handleDeleteLesson = async (id: string) => {
-    if (confirm('Are you sure you want to delete this lesson?')) {
-      await lessonService.delete(id);
-      if (selectedCourse) handleSelectCourse(selectedCourse);
-    }
+  const handleDeleteLesson = (id: string) => {
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Lesson',
+      message: 'Are you sure you want to delete this lesson?',
+      onConfirm: async () => {
+        try {
+          await lessonService.delete(id);
+          toast.success('Lesson deleted successfully');
+          if (selectedCourse) handleSelectCourse(selectedCourse);
+        } catch (err: any) {
+          toast.error('Failed to delete lesson');
+        }
+      },
+    });
   };
 
   const handlePreviewLesson = (les: Lesson) => {
@@ -598,11 +657,21 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     setIsAssignmentModalOpen(true);
   };
 
-  const handleDeleteAssignment = async (id: string) => {
-    if (confirm('Are you sure you want to delete this assignment?')) {
-      await assignmentService.delete(id);
-      if (selectedCourse) handleSelectCourse(selectedCourse);
-    }
+  const handleDeleteAssignment = (id: string) => {
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Assignment',
+      message: 'Are you sure you want to delete this assignment?',
+      onConfirm: async () => {
+        try {
+          await assignmentService.delete(id);
+          toast.success('Assignment deleted successfully');
+          if (selectedCourse) handleSelectCourse(selectedCourse);
+        } catch (err: any) {
+          toast.error('Failed to delete assignment');
+        }
+      },
+    });
   };
 
   const handleSaveQuiz = async (e: React.FormEvent) => {
@@ -680,11 +749,21 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     setIsQuizModalOpen(true);
   };
 
-  const handleDeleteQuiz = async (id: string) => {
-    if (confirm('Are you sure you want to delete this quiz?')) {
-      await quizService.delete(id);
-      if (selectedCourse) handleSelectCourse(selectedCourse);
-    }
+  const handleDeleteQuiz = (id: string) => {
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Quiz',
+      message: 'Are you sure you want to delete this quiz?',
+      onConfirm: async () => {
+        try {
+          await quizService.delete(id);
+          toast.success('Quiz deleted successfully');
+          if (selectedCourse) handleSelectCourse(selectedCourse);
+        } catch (err: any) {
+          toast.error('Failed to delete quiz');
+        }
+      },
+    });
   };
 
   const handlePreviewQuiz = (qz: Quiz) => {
@@ -1487,7 +1566,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => window.open(selectedCourse.brochureUrl, '_blank')}
+                            onClick={() => window.open(getAuthenticatedFileUrl(selectedCourse.brochureUrl), '_blank')}
                             className="text-xs h-8"
                           >
                             <Eye className="h-3.5 w-3.5 mr-1" /> View Brochure
@@ -1915,7 +1994,8 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     );
   };
 
-  const renderFilePreview = (fileUrl: string | null | undefined) => {
+  const renderFilePreview = (rawFileUrl: string | null | undefined) => {
+    const fileUrl = getAuthenticatedFileUrl(rawFileUrl);
     if (!fileUrl) {
       return (
         <div className="flex flex-col items-center justify-center h-full p-8 border border-dashed border-slate-200 rounded-xl bg-slate-50 text-center">
@@ -2258,7 +2338,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                             <td className="p-4 text-right space-x-2 whitespace-nowrap">
                               {sub.fileUrl && (
                                 <a
-                                  href={sub.fileUrl}
+                                  href={getAuthenticatedFileUrl(sub.fileUrl)}
                                   download
                                   className="inline-flex items-center justify-center rounded-lg text-[10px] font-bold h-7 px-3 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all shadow-xs cursor-pointer"
                                 >
@@ -2832,19 +2912,24 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteProject = async (projectId: string) => {
-    if (confirm('Are you sure you want to delete this project? All intern registrations for it will be deleted.')) {
-      setLoading(true);
-      try {
-        await projectService.delete(projectId);
-        toast.success('Project successfully deleted');
-        await loadProjectCoordinatorData();
-      } catch (err) {
-        alert('Failed to delete project');
-      } finally {
-        setLoading(false);
-      }
-    }
+  const handleDeleteProject = (projectId: string) => {
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Project',
+      message: 'Are you sure you want to delete this project? All intern registrations for it will be deleted.',
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          await projectService.delete(projectId);
+          toast.success('Project successfully deleted');
+          await loadProjectCoordinatorData();
+        } catch (err) {
+          toast.error('Failed to delete project');
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   };
 
   const renderProjects = () => {
@@ -3309,7 +3394,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
               <div className="flex items-center justify-between p-3 border border-emerald-500/20 bg-emerald-500/5 rounded-lg text-xs">
                 <span className="text-emerald-700 dark:text-emerald-400 font-semibold truncate mr-2">PDF Reference Material Attached</span>
                 <a
-                  href={previewingLesson.pdfResource}
+                  href={getAuthenticatedFileUrl(previewingLesson.pdfResource)}
                   target="_blank"
                   rel="noreferrer"
                   className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-md shadow-sm no-underline text-[10px]"
@@ -3429,7 +3514,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                 <span className="truncate">File Preview: {selectedSub.projectFileName || 'Document'}</span>
                 {selectedSub.fileUrl && (
                   <a
-                    href={selectedSub.fileUrl}
+                    href={getAuthenticatedFileUrl(selectedSub.fileUrl)}
                     download
                     className="inline-flex items-center gap-1 hover:text-primary transition-colors cursor-pointer text-slate-500 font-semibold"
                   >
@@ -3633,6 +3718,34 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* Modal: Confirm Delete General */}
+      {deleteConfirm && (
+        <Modal
+          isOpen={deleteConfirm.show}
+          onClose={() => setDeleteConfirm(null)}
+          title={deleteConfirm.title}
+        >
+          <div className="p-6 space-y-4 text-left">
+            <p className="text-sm text-foreground">{deleteConfirm.message}</p>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  const onConfirm = deleteConfirm.onConfirm;
+                  setDeleteConfirm(null);
+                  await onConfirm();
+                }}
+              >
+                Confirm Delete
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

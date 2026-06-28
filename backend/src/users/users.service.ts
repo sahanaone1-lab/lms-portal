@@ -207,6 +207,18 @@ export class UsersService {
       await this.autoEnrollInternInDomainCourses(user.id, user.domain);
     }
 
+    if (user.role === Role.PROJECT_COORDINATOR) {
+      await this.prisma.notification.create({
+        data: {
+          userId: user.id,
+          title: 'Coordinator Added',
+          message: `Welcome ${user.name}! You have been added as a Project Coordinator.`,
+          type: 'coordinator_added',
+          entityId: user.id,
+        },
+      }).catch(() => {});
+    }
+
     return user;
   }
 

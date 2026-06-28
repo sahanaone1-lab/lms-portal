@@ -8,6 +8,7 @@ import { courseService, lessonService, assignmentService, submissionService, qui
 import { Course, Lesson, Assignment, Submission, Quiz, QuizResult, Certificate, Project, ProjectRegistration } from '../types';
 import { BookOpen, Award, CheckCircle, Play, FileText, HelpCircle, GraduationCap, ArrowLeft, ArrowRight, ExternalLink, Check, Users, Send, Sparkles, Bot, X, Briefcase, Eye, ChevronDown, ChevronRight, Clock } from 'lucide-react';
 import { HeroBanner } from '../components/HeroBanner';
+import { getAuthenticatedFileUrl } from '../services/api';
 
 
 interface ProjectSubmissionFormProps {
@@ -145,9 +146,35 @@ export const InternDashboard: React.FC = () => {
   const [completedLessons, setCompletedLessons] = useState<Record<string, boolean>>({});
   const [watchedVideos, setWatchedVideos] = useState<Record<string, boolean>>({});
   const [activeProjectWeekId, setActiveProjectWeekId] = useState<string | null>(null);
-  // New: module-level selection and lesson accordion
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [expandedLessonId, setExpandedLessonId] = useState<string | null>(null);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    const courseId = params.get('id');
+
+    if (tab === 'certificates') {
+      setActiveTab('certificates');
+    } else if (tab === 'enrolled') {
+      setActiveTab('enrolled');
+    }
+
+    if (courseId && enrolledCourses.length > 0) {
+      const c = enrolledCourses.find(course => course.id === courseId);
+      if (c) {
+        setActiveCourse(c);
+        setActiveTab('enrolled');
+      }
+    }
+  }, [location.search, enrolledCourses]);
 
 
   useEffect(() => {
@@ -665,7 +692,7 @@ export const InternDashboard: React.FC = () => {
                                 {submission.fileUrl ? (
                                   <div className="flex items-center justify-between gap-2 mt-1">
                                     <a
-                                      href={submission.fileUrl}
+                                      href={getAuthenticatedFileUrl(submission.fileUrl)}
                                       target="_blank"
                                       rel="noreferrer"
                                       className="inline-flex items-center text-primary font-bold hover:underline"
@@ -676,20 +703,25 @@ export const InternDashboard: React.FC = () => {
                                       variant="destructive"
                                       size="sm"
                                       className="bg-red-600 hover:bg-red-700 text-white text-[10px] h-7 px-2.5 rounded-lg flex items-center gap-1.5 shrink-0 ml-2"
-                                      onClick={async () => {
-                                        if (confirm('Are you sure you want to delete this uploaded project file? This will permanently delete the file record and physical file.')) {
-                                          try {
-                                            await submissionService.delete(submission.id);
-                                            setMySubmissions(prev => {
-                                              const next = { ...prev };
-                                              delete next[assignment.id];
-                                              return next;
-                                            });
-                                            toast.success('Project deleted successfully.');
-                                          } catch (err: any) {
-                                            toast.error(err.response?.data?.message || 'Failed to delete project.');
-                                          }
-                                        }
+                                      onClick={() => {
+                                        setDeleteConfirm({
+                                          show: true,
+                                          title: 'Delete Uploaded File',
+                                          message: 'Are you sure you want to delete this uploaded project file? This will permanently delete the file record and physical file.',
+                                          onConfirm: async () => {
+                                            try {
+                                              await submissionService.delete(submission.id);
+                                              setMySubmissions(prev => {
+                                                const next = { ...prev };
+                                                delete next[assignment.id];
+                                                return next;
+                                              });
+                                              toast.success('Project deleted successfully.');
+                                            } catch (err: any) {
+                                              toast.error(err.response?.data?.message || 'Failed to delete project.');
+                                            }
+                                          },
+                                        });
                                       }}
                                     >
                                       Delete Project
@@ -1178,7 +1210,7 @@ export const InternDashboard: React.FC = () => {
                     <Eye className="h-3.5 w-3.5" />
                     View
                   </button>
-                  <a href={activeCourse.brochureUrl} download
+                  <a href={getAuthenticatedFileUrl(activeCourse.brochureUrl)} download
                     className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#0F4C81] text-white hover:bg-[#1B6CA8] transition-colors shadow-sm">
                     <ExternalLink className="h-3.5 w-3.5" />
                     Download
@@ -1400,7 +1432,7 @@ export const InternDashboard: React.FC = () => {
                                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Study Material / PDF</p>
                                     <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{lesson.attachmentUrl}</p>
                                   </div>
-                                  <a href={lesson.attachmentUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-[#0F4C81] dark:text-blue-400 bg-[#EAF4F8] dark:bg-[#0F4C81]/20 border border-[#0F4C81]/20 hover:bg-[#0F4C81]/10 transition-colors">
+                                  <a href={getAuthenticatedFileUrl(lesson.attachmentUrl)} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-[#0F4C81] dark:text-blue-400 bg-[#EAF4F8] dark:bg-[#0F4C81]/20 border border-[#0F4C81]/20 hover:bg-[#0F4C81]/10 transition-colors">
                                     <ExternalLink className="h-3 w-3" /> View
                                   </a>
                                 </div>
@@ -1794,7 +1826,7 @@ export const InternDashboard: React.FC = () => {
                     </div>
                   </div>
                   <a
-                    href={selectedAssignment.attachmentUrl}
+                    href={getAuthenticatedFileUrl(selectedAssignment.attachmentUrl)}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center text-xs text-primary hover:underline font-semibold shrink-0 ml-2"
@@ -1819,7 +1851,7 @@ export const InternDashboard: React.FC = () => {
                     <div className="min-w-0 flex-1 text-left">
                       <span className="font-bold block mb-1">Attached Project File:</span>
                       <a
-                        href={mySubmissions[selectedAssignment.id].fileUrl || '#'}
+                        href={getAuthenticatedFileUrl(mySubmissions[selectedAssignment.id].fileUrl || '#')}
                         target="_blank"
                         rel="noreferrer"
                         className="text-primary hover:underline font-semibold break-all text-left"
@@ -1831,22 +1863,27 @@ export const InternDashboard: React.FC = () => {
                       variant="destructive"
                       size="sm"
                       className="bg-red-600 hover:bg-red-700 text-white text-[10px] h-7 px-2.5 rounded-lg flex items-center gap-1.5 shrink-0 ml-2"
-                      onClick={async () => {
-                        if (confirm('Are you sure you want to delete this uploaded project file? This will permanently delete the file record and physical file.')) {
-                          try {
-                            await submissionService.delete(mySubmissions[selectedAssignment.id].id);
-                            setMySubmissions(prev => {
-                              const next = { ...prev };
-                              delete next[selectedAssignment.id];
-                              return next;
-                            });
-                            setSubmitFile('');
-                            setSubmitFileName('');
-                            toast.success('Project deleted successfully.');
-                          } catch (err: any) {
-                            toast.error(err.response?.data?.message || 'Failed to delete project.');
-                          }
-                        }
+                      onClick={() => {
+                        setDeleteConfirm({
+                          show: true,
+                          title: 'Delete Uploaded File',
+                          message: 'Are you sure you want to delete this uploaded project file? This will permanently delete the file record and physical file.',
+                          onConfirm: async () => {
+                            try {
+                              await submissionService.delete(mySubmissions[selectedAssignment.id].id);
+                              setMySubmissions(prev => {
+                                const next = { ...prev };
+                                delete next[selectedAssignment.id];
+                                return next;
+                              });
+                              setSubmitFile('');
+                              setSubmitFileName('');
+                              toast.success('Project deleted successfully.');
+                            } catch (err: any) {
+                              toast.error(err.response?.data?.message || 'Failed to delete project.');
+                            }
+                          },
+                        });
                       }}
                     >
                       Delete Project
@@ -2008,6 +2045,34 @@ export const InternDashboard: React.FC = () => {
           </form>
         )}
       </Modal>
+
+      {/* Modal: Confirm Delete General */}
+      {deleteConfirm && (
+        <Modal
+          isOpen={deleteConfirm.show}
+          onClose={() => setDeleteConfirm(null)}
+          title={deleteConfirm.title}
+        >
+          <div className="p-6 space-y-4 text-left">
+            <p className="text-sm text-foreground">{deleteConfirm.message}</p>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  const onConfirm = deleteConfirm.onConfirm;
+                  setDeleteConfirm(null);
+                  await onConfirm();
+                }}
+              >
+                Confirm Delete
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

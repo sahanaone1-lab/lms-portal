@@ -97,30 +97,46 @@ export const DashboardLayout: React.FC = () => {
     setIsNotifOpen(false);
 
     // 3. Route to respective page based on notification details or user role
+    const type = notif.type;
+    const entityId = notif.entityId;
     const title = (notif.title || '').toLowerCase();
     const userRole = user?.role;
 
     if (userRole === 'PROJECT_COORDINATOR') {
-      if (title.includes('submission') || title.includes('assignment') || title.includes('graded')) {
-        navigate('/project-coordinator/grading');
-      } else if (title.includes('certificate') || title.includes('claim') || title.includes('request')) {
+      if (type === 'project_assigned') {
+        navigate(`/project-coordinator/projects?id=${entityId}`);
+      } else if (type === 'assignment_submitted') {
+        navigate(`/project-coordinator/grading?submissionId=${entityId}`);
+      } else if (type === 'certificate_claim' || title.includes('certificate') || title.includes('request')) {
         navigate('/project-coordinator/certificates');
       } else {
         navigate('/project-coordinator');
       }
     } else if (userRole === 'ADMIN') {
-      if (title.includes('certificate') || title.includes('request')) {
+      if (type === 'new_intern' || type === 'coordinator_added') {
+        navigate(`/admin/users?edit=${entityId}`);
+      } else if (type === 'new_course') {
+        navigate(`/admin/courses?id=${entityId}`);
+      } else if (title.includes('certificate') || title.includes('request')) {
         navigate('/admin/projects');
       } else {
         navigate('/admin');
       }
     } else if (userRole === 'INTERN') {
-      if (title.includes('certificate')) {
+      if (type === 'new_course') {
+        navigate(`/intern/enrolled?id=${entityId}`);
+      } else if (type === 'assignment_graded') {
+        navigate(`/intern/enrolled`);
+      } else if (type === 'certificate_approved' || type === 'certificate_rejected') {
         navigate('/intern/certificates');
-      } else if (title.includes('graded') || title.includes('assignment')) {
-        navigate('/intern/enrolled');
       } else {
-        navigate('/intern');
+        if (title.includes('certificate')) {
+          navigate('/intern/certificates');
+        } else if (title.includes('graded') || title.includes('assignment')) {
+          navigate('/intern/enrolled');
+        } else {
+          navigate('/intern');
+        }
       }
     }
   };

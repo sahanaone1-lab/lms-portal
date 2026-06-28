@@ -7,20 +7,37 @@ import {
   UseGuards,
   NotFoundException,
   ForbiddenException,
+  Injectable,
+  ExecutionContext,
 } from '@nestjs/common';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { AuthGuard } from '@nestjs/passport';
 import { PrismaService } from '../prisma/prisma.service';
 import * as express from 'express';
 import { join } from 'path';
 import * as fs from 'fs';
 import { Role } from '@prisma/client';
 
+@Injectable()
+export class UploadsAuthGuard extends AuthGuard('jwt') {
+  canActivate(context: ExecutionContext) {
+    const request = context.switchToHttp().getRequest();
+    const filename = request.params.filename;
+    
+    // If the file is a public brochure (does not start with 'file-')
+    if (filename && !filename.startsWith('file-')) {
+      return true; // Bypass authentication
+    }
+    
+    return super.canActivate(context);
+  }
+}
+
 @Controller('uploads')
 export class UploadsController {
   constructor(private prisma: PrismaService) {}
 
   @Get(':filename')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(UploadsAuthGuard)
   async serveFile(
     @Param('filename') filename: string,
     @Req() req: any,
@@ -35,6 +52,9 @@ export class UploadsController {
 
     // If it is a project file
     if (filename.startsWith('file-')) {
+      if (!user) {
+        throw new ForbiddenException('Authentication required for this file');
+      }
       const submission = await this.prisma.submission.findFirst({
         where: {
           fileUrl: {
@@ -72,6 +92,7 @@ export class UploadsController {
       }
     }
 
+    res.setHeader('Content-Disposition', 'inline');
     return res.sendFile(filePath);
   }
 }

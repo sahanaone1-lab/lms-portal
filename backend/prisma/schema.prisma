@@ -195,6 +195,8 @@ model Notification {
   read      Boolean  @default(false)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entityId  String?  @map("entity_id")
+  type      String?
   createdAt DateTime @default(now())
 }
 

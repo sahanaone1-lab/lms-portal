@@ -105,6 +105,17 @@ export class CoursesService {
           courseId: course.id,
         },
       }).catch(() => { });
+
+      // Notify the intern about the new course
+      await this.prisma.notification.create({
+        data: {
+          userId: intern.id,
+          title: 'New Course Available',
+          message: `You have been enrolled in a new course: "${course.title}".`,
+          type: 'new_course',
+          entityId: course.id,
+        },
+      }).catch(() => {});
     }
 
     return course;

@@ -169,6 +169,8 @@ export interface Notification {
   message: string;
   read: boolean;
   userId: string;
+  entityId?: string;
+  type?: string;
   createdAt: string;
 }
 
