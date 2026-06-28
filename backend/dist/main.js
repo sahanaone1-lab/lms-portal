@@ -23,11 +23,11 @@ async function bootstrap() {
             if (!origin)
                 return callback(null, true);
             if (allowedOrigins.includes(origin) ||
-                origin.includes('vercel.app')) {
+                origin.endsWith('.vercel.app')) {
                 return callback(null, true);
             }
-            console.log('Blocked by CORS:', origin);
-            return callback(null, true); // IMPORTANT: avoid breaking frontend in production
+            console.log('❌ Blocked by CORS:', origin);
+            return callback(new Error('Not allowed by CORS'));
         },
         credentials: true,
     });
