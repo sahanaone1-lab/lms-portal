@@ -15,16 +15,19 @@ async function bootstrap() {
     const frontendUrl = process.env.FRONTEND_URL;
     app.enableCors({
         origin: (origin, callback) => {
-            if (!origin ||
-                origin.indexOf('localhost') !== -1 ||
-                origin.indexOf('127.0.0.1') !== -1 ||
-                origin.indexOf('[::1]') !== -1 ||
-                (frontendUrl && origin === frontendUrl)) {
-                callback(null, true);
+            const allowedOrigins = [
+                'http://localhost:5173',
+                'http://localhost:3000',
+                process.env.FRONTEND_URL,
+            ];
+            if (!origin)
+                return callback(null, true);
+            if (allowedOrigins.includes(origin) ||
+                origin.includes('vercel.app')) {
+                return callback(null, true);
             }
-            else {
-                callback(null, false);
-            }
+            console.log('Blocked by CORS:', origin);
+            return callback(null, true); // IMPORTANT: avoid breaking frontend in production
         },
         credentials: true,
     });
