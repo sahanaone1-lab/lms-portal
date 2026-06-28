@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Backend runs on http://localhost:3000 by default in NestJS
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+export const API_URL = import.meta.env.VITE_API_URL;
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -73,10 +73,10 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const response = await api.post('/auth/refresh');
+        const response = await api.post(`${API_URL}/auth/refresh`);
         const { accessToken } = response.data;
         setAccessToken(accessToken);
-        
+
         // Custom event or callback to update React AuthContext
         window.dispatchEvent(new CustomEvent('auth:token_refreshed', { detail: accessToken }));
 
