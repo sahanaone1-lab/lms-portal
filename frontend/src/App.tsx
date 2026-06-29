@@ -115,6 +115,7 @@ function App() {
                 <Route path="admin/courses" element={<RoleRoute allowedRoles={['ADMIN']}><AdminDashboard /></RoleRoute>} />
                 <Route path="admin/domains" element={<RoleRoute allowedRoles={['ADMIN']}><AdminDashboard /></RoleRoute>} />
                 <Route path="admin/projects" element={<RoleRoute allowedRoles={['ADMIN']}><AdminDashboard /></RoleRoute>} />
+                <Route path="admin/presentations" element={<RoleRoute allowedRoles={['ADMIN']}><AdminDashboard /></RoleRoute>} />
 
                 {/* Project Coordinator */}
                 <Route path="project-coordinator"              element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
@@ -123,6 +124,7 @@ function App() {
                 <Route path="project-coordinator/projects"     element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
                 <Route path="project-coordinator/domains"      element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
                 <Route path="project-coordinator/certificates" element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
+                <Route path="project-coordinator/presentations" element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
 
                 {/* Intern */}
                 <Route path="intern"              element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
@@ -130,6 +132,7 @@ function App() {
                 <Route path="intern/enrolled"     element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
                 <Route path="intern/projects"     element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
                 <Route path="intern/certificates" element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
+                <Route path="intern/presentations" element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
 
                 {/* Common */}
                 <Route path="settings" element={<Settings />} />

@@ -109,6 +109,8 @@ export const DashboardLayout: React.FC = () => {
         navigate(`/project-coordinator/grading?submissionId=${entityId}`);
       } else if (type === 'certificate_claim' || title.includes('certificate') || title.includes('request')) {
         navigate('/project-coordinator/certificates');
+      } else if (type === 'presentation_registration') {
+        navigate('/project-coordinator/presentations');
       } else {
         navigate('/project-coordinator');
       }
@@ -134,6 +136,10 @@ export const DashboardLayout: React.FC = () => {
           navigate('/intern/certificates');
         } else if (title.includes('graded') || title.includes('assignment')) {
           navigate('/intern/enrolled');
+        } else if (type === 'presentation_announced') {
+          navigate('/intern/presentations');
+        } else if (type === 'presentation_approved' || type === 'presentation_rejected') {
+          navigate('/intern/presentations');
         } else {
           navigate('/intern');
         }
@@ -166,13 +172,16 @@ export const DashboardLayout: React.FC = () => {
     { title: 'Manage Courses', path: '/admin/courses', icon: BookOpen, roles: ['ADMIN'] },
     { title: 'Domain Management', path: '/admin/domains', icon: Grid, roles: ['ADMIN'] },
     { title: 'Presentation Registration', path: '/admin/projects', icon: Briefcase, roles: ['ADMIN'] },
+    { title: 'Presentation Registrations', path: '/admin/presentations', icon: Award, roles: ['ADMIN'] },
     { title: 'My Courses', path: '/project-coordinator/courses', icon: BookOpen, roles: ['PROJECT_COORDINATOR'] },
     { title: 'Grades', path: '/project-coordinator/grading', icon: FileCheck, roles: ['PROJECT_COORDINATOR'] },
     { title: 'Presentation Registration', path: '/project-coordinator/projects', icon: Briefcase, roles: ['PROJECT_COORDINATOR'] },
+    { title: 'Presentations', path: '/project-coordinator/presentations', icon: Award, roles: ['PROJECT_COORDINATOR'] },
     { title: 'Certificate Requests', path: '/project-coordinator/certificates', icon: Award, roles: ['PROJECT_COORDINATOR'] },
     { title: 'Domains', path: '/project-coordinator/domains', icon: Grid, roles: ['PROJECT_COORDINATOR'] },
     { title: 'My Enrolled Courses', path: '/intern/enrolled', icon: GraduationCap, roles: ['INTERN'] },
     { title: 'Presentation Registration', path: '/intern/projects', icon: Briefcase, roles: ['INTERN'] },
+    { title: 'Upcoming Presentations', path: '/intern/presentations', icon: Award, roles: ['INTERN'] },
     { title: 'My Certificates', path: '/intern/certificates', icon: FileCheck, roles: ['INTERN'] }
   ];
 
@@ -209,6 +218,8 @@ export const DashboardLayout: React.FC = () => {
         return 'Domain Management';
       case '/admin/projects':
         return 'Presentation Registration';
+      case '/admin/presentations':
+        return 'Presentation Registrations';
 
       // Project Coordinator paths
       case '/project-coordinator':
@@ -219,6 +230,8 @@ export const DashboardLayout: React.FC = () => {
         return 'Grades';
       case '/project-coordinator/projects':
         return 'Presentation Registration';
+      case '/project-coordinator/presentations':
+        return 'Presentations';
       case '/project-coordinator/domains':
         return 'Domains';
       case '/project-coordinator/certificates':
@@ -233,6 +246,8 @@ export const DashboardLayout: React.FC = () => {
         return 'My Enrolled Courses';
       case '/intern/projects':
         return 'Presentation Registration';
+      case '/intern/presentations':
+        return 'Upcoming Presentations';
       case '/intern/certificates':
         return 'My Certificates';
 

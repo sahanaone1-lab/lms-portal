@@ -4,7 +4,8 @@
  * No localStorage mock — all data is persisted in PostgreSQL.
  */
 import { api, API_URL, getAuthenticatedFileUrl } from './api';
-import { User, Course, Lesson, Assignment, Submission, Quiz, QuizResult, Certificate, Notification, Role, Domain, Project, ProjectRegistration } from '../types';
+import { User, Course, Lesson, Assignment, Submission, Quiz, QuizResult, Certificate, Notification, Role, Domain, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord } from '../types';
+
 
 // ---------------------------------------------------------------------------
 // Auth (profile only — login/logout/register live in AuthContext)
@@ -407,3 +408,119 @@ export const projectService = {
     return res.data;
   },
 };
+
+// ---------------------------------------------------------------------------
+// Presentations
+// ---------------------------------------------------------------------------
+export const presentationService = {
+  getAll: async (): Promise<Presentation[]> => {
+    const res = await api.get('/presentations');
+    return res.data;
+  },
+
+  getById: async (id: string): Promise<Presentation> => {
+    const res = await api.get(`/presentations/${id}`);
+    return res.data;
+  },
+
+  create: async (data: {
+    title: string;
+    description: string;
+    presentationDate: string;
+    presentationTime: string;
+    status?: string;
+  }): Promise<Presentation> => {
+    const res = await api.post('/presentations', data);
+    return res.data;
+  },
+
+  update: async (
+    id: string,
+    data: Partial<{
+      title: string;
+      description: string;
+      presentationDate: string;
+      presentationTime: string;
+      status: string;
+    }>,
+  ): Promise<Presentation> => {
+    const res = await api.patch(`/presentations/${id}`, data);
+    return res.data;
+  },
+
+  delete: async (id: string): Promise<{ isDeleted: boolean }> => {
+    const res = await api.delete(`/presentations/${id}`);
+    return res.data;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Presentation Registrations
+// ---------------------------------------------------------------------------
+export const presentationRegistrationService = {
+  create: async (data: {
+    presentationId: string;
+    fullName: string;
+    domain: string;
+    collegeName: string;
+    yearOfStudy: string;
+    internshipTiming: string;
+    internshipStartDate: string;
+    internshipEndDate: string;
+    purpose: string;
+    projectsWorkedOn: string;
+    willingToAttend: boolean;
+    qaQuestions: string;
+    additionalRemarks?: string;
+    internSignature: string;
+  }): Promise<PresentationRegistrationRecord> => {
+    const res = await api.post('/presentation-registrations', data);
+    return res.data;
+  },
+
+  getAll: async (filters?: {
+    presentationId?: string;
+    internId?: string;
+    date?: string;
+  }): Promise<PresentationRegistrationRecord[]> => {
+    const params = new URLSearchParams();
+    if (filters?.presentationId) params.append('presentationId', filters.presentationId);
+    if (filters?.internId) params.append('internId', filters.internId);
+    if (filters?.date) params.append('date', filters.date);
+    const res = await api.get(`/presentation-registrations?${params.toString()}`);
+    return res.data;
+  },
+
+  getById: async (id: string): Promise<PresentationRegistrationRecord> => {
+    const res = await api.get(`/presentation-registrations/${id}`);
+    return res.data;
+  },
+
+  update: async (
+    id: string,
+    data: { status?: string; coordinatorSignature?: string },
+  ): Promise<PresentationRegistrationRecord> => {
+    const res = await api.patch(`/presentation-registrations/${id}`, data);
+    return res.data;
+  },
+
+  downloadPdfUrl: (id: string): string => {
+    const token = (api.defaults.headers?.common?.['Authorization'] as string)?.replace('Bearer ', '') || '';
+    return `${API_URL}/presentation-registrations/${id}/pdf?token=${token}`;
+  },
+
+  downloadPdf: async (id: string): Promise<void> => {
+    const res = await api.get(`/presentation-registrations/${id}/pdf`, {
+      responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `presentation-registration-${id}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+};
+

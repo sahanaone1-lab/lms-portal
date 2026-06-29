@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/Toast';
 import { Button, Input, Select, Textarea, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Modal, Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui';
-import { courseService, lessonService, assignmentService, quizService, submissionService, userService, certificateService, domainService, projectService } from '../services/apiService';
-import { Course, Lesson, Assignment, Quiz, Submission, Question, User, Certificate, Domain, Project, ProjectRegistration } from '../types';
-import { BookOpen, Plus, FileText, CheckCircle, Video, ListTodo, Award, Check, Users, FileCheck, ArrowLeft, Grid, Layers, Database, Brain, Shield, Globe, Search, Calendar, ChevronLeft, ChevronRight, Clock, Eye, Trash, Edit, Play, Briefcase, Upload } from 'lucide-react';
+import { courseService, lessonService, assignmentService, quizService, submissionService, userService, certificateService, domainService, projectService, presentationService, presentationRegistrationService } from '../services/apiService';
+import { Course, Lesson, Assignment, Quiz, Submission, Question, User, Certificate, Domain, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord } from '../types';
+import { BookOpen, Plus, FileText, CheckCircle, Video, ListTodo, Award, Check, Users, FileCheck, ArrowLeft, Grid, Layers, Database, Brain, Shield, Globe, Search, Calendar, ChevronLeft, ChevronRight, Clock, Eye, Trash, Edit, Play, Briefcase, Upload, Download, X } from 'lucide-react';
 
 import { useAuth } from '../store/AuthContext';
 import { HeroBanner } from '../components/HeroBanner';
@@ -140,6 +140,24 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
   const [projectStatusFilter, setProjectStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
 
+  // ── Presentations state ───────────────────────────────────────────────────
+  const [presentations, setPresentations] = useState<Presentation[]>([]);
+  const [presentationRegistrations, setPresentationRegistrations] = useState<PresentationRegistrationRecord[]>([]);
+  const [isPresentationModalOpen, setIsPresentationModalOpen] = useState(false);
+  const [isEditPresentationModalOpen, setIsEditPresentationModalOpen] = useState(false);
+  const [editingPresentation, setEditingPresentation] = useState<Presentation | null>(null);
+  const [selectedRegistration, setSelectedRegistration] = useState<PresentationRegistrationRecord | null>(null);
+  const [isRegistrationDetailOpen, setIsRegistrationDetailOpen] = useState(false);
+  const [presTitle, setPresTitle] = useState('');
+  const [presDescription, setPresDescription] = useState('');
+  const [presDate, setPresDate] = useState('');
+  const [presTime, setPresTime] = useState('');
+  const [presStatus, setPresStatus] = useState('UPCOMING');
+  const [presFilterPresentationId, setPresFilterPresentationId] = useState('');
+  const [presFilterDate, setPresFilterDate] = useState('');
+  const [coordSignature, setCoordSignature] = useState('');
+  const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
+
   const loadProjectCoordinatorData = async () => {
     try {
       // Load ALL courses for this projectCoordinator's domain (not just self-created)
@@ -165,6 +183,12 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       setInternsMonitoring(monitoringData);
       setDomains(activeDomains);
       setProjects(projectsData);
+
+      // Load presentations
+      const presentationsData = await presentationService.getAll().catch(() => []);
+      const regsData = await presentationRegistrationService.getAll().catch(() => []);
+      setPresentations(presentationsData);
+      setPresentationRegistrations(regsData);
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Failed to sync projectCoordinator data from database.');
@@ -3062,6 +3086,409 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     );
   };
 
+  // ── renderPresentations ───────────────────────────────────────────────────
+  const renderPresentationSection = () => {
+    const handleCreatePresentation = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      try {
+        await presentationService.create({
+          title: presTitle,
+          description: presDescription,
+          presentationDate: presDate,
+          presentationTime: presTime,
+          status: presStatus,
+        });
+        toast.success('Presentation created and interns notified!');
+        setIsPresentationModalOpen(false);
+        setPresTitle(''); setPresDescription(''); setPresDate(''); setPresTime(''); setPresStatus('UPCOMING');
+        await loadProjectCoordinatorData();
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || 'Failed to create presentation');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleEditPresentation = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!editingPresentation) return;
+      setLoading(true);
+      try {
+        await presentationService.update(editingPresentation.id, {
+          title: presTitle,
+          description: presDescription,
+          presentationDate: presDate,
+          presentationTime: presTime,
+          status: presStatus,
+        });
+        toast.success('Presentation updated!');
+        setIsEditPresentationModalOpen(false);
+        setEditingPresentation(null);
+        await loadProjectCoordinatorData();
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || 'Failed to update presentation');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleClosePresentation = (pres: Presentation) => {
+      setDeleteConfirm({
+        show: true,
+        title: 'Close Presentation',
+        message: `Close "${pres.title}"? Interns will no longer be able to register.`,
+        onConfirm: async () => {
+          await presentationService.update(pres.id, { status: 'CLOSED' });
+          toast.success('Presentation closed');
+          await loadProjectCoordinatorData();
+        },
+      });
+    };
+
+    const handleDeletePresentation = (pres: Presentation) => {
+      setDeleteConfirm({
+        show: true,
+        title: 'Delete Presentation',
+        message: `Soft-delete "${pres.title}"? It will be hidden from all views.`,
+        onConfirm: async () => {
+          await presentationService.delete(pres.id);
+          toast.success('Presentation deleted');
+          await loadProjectCoordinatorData();
+        },
+      });
+    };
+
+    const handleApproveRegistration = async (reg: PresentationRegistrationRecord) => {
+      setLoading(true);
+      try {
+        await presentationRegistrationService.update(reg.id, { status: 'APPROVED' });
+        toast.success('Registration approved — intern notified');
+        await loadProjectCoordinatorData();
+        if (selectedRegistration?.id === reg.id) {
+          setSelectedRegistration(prev => prev ? { ...prev, status: 'APPROVED' } : prev);
+        }
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || 'Failed to approve');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleRejectRegistration = async (reg: PresentationRegistrationRecord) => {
+      setLoading(true);
+      try {
+        await presentationRegistrationService.update(reg.id, { status: 'REJECTED' });
+        toast.error('Registration rejected — intern notified');
+        await loadProjectCoordinatorData();
+        if (selectedRegistration?.id === reg.id) {
+          setSelectedRegistration(prev => prev ? { ...prev, status: 'REJECTED' } : prev);
+        }
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || 'Failed to reject');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleAddSignature = async (reg: PresentationRegistrationRecord) => {
+      if (!coordSignature.trim()) { toast.error('Please enter your signature'); return; }
+      setLoading(true);
+      try {
+        await presentationRegistrationService.update(reg.id, { coordinatorSignature: coordSignature });
+        toast.success('Coordinator signature saved');
+        await loadProjectCoordinatorData();
+        setCoordSignature('');
+        if (selectedRegistration?.id === reg.id) {
+          setSelectedRegistration(prev => prev ? { ...prev, coordinatorSignature: coordSignature } : prev);
+        }
+      } catch (err: any) {
+        toast.error('Failed to save signature');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleDownloadPdf = async (regId: string) => {
+      setPdfLoadingId(regId);
+      try {
+        await presentationRegistrationService.downloadPdf(regId);
+        toast.success('PDF downloaded!');
+      } catch (err) {
+        toast.error('Failed to download PDF');
+      } finally {
+        setPdfLoadingId(null);
+      }
+    };
+
+    const statusColor = (s: string) => {
+      if (s === 'APPROVED') return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
+      if (s === 'REJECTED') return 'bg-red-500/10 text-red-600 border-red-500/20';
+      return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+    };
+
+    const filteredRegs = presentationRegistrations.filter(r => {
+      if (presFilterPresentationId && r.presentationId !== presFilterPresentationId) return false;
+      if (presFilterDate && !r.createdAt.startsWith(presFilterDate)) return false;
+      return true;
+    });
+
+    return (
+      <div className="space-y-6 animate-fade-in text-left">
+        {/* Hero Banner */}
+        <div className="rounded-2xl bg-gradient-to-br from-[#0F4C81] to-[#17A2B8] p-6 text-white shadow-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-white/60 mb-1">COORDINATOR · PRESENTATIONS</p>
+              <h1 className="text-2xl font-bold">Presentation Portal</h1>
+              <p className="text-sm text-white/80 mt-1">Create, manage and review presentation registrations from interns.</p>
+            </div>
+            <Button
+              onClick={() => { setPresTitle(''); setPresDescription(''); setPresDate(''); setPresTime(''); setPresStatus('UPCOMING'); setIsPresentationModalOpen(true); }}
+              className="flex items-center gap-2 bg-white text-[#0F4C81] hover:bg-white/90 font-bold shadow-md rounded-xl px-4 py-2 text-sm"
+            >
+              <Plus className="h-4 w-4" /> New Presentation
+            </Button>
+          </div>
+        </div>
+
+        {/* Presentations Grid */}
+        <div>
+          <h2 className="text-base font-bold mb-3 text-foreground">All Presentations ({presentations.length})</h2>
+          {presentations.length === 0 ? (
+            <Card className="border border-border/80 p-12 text-center text-muted-foreground bg-card/50">
+              <Award className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+              <p className="font-semibold text-sm">No presentations yet.</p>
+              <p className="text-xs mt-1">Click "New Presentation" to schedule one.</p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {presentations.map(pres => (
+                <Card key={pres.id} className="border border-border/80 shadow-sm hover:shadow-md transition-all bg-card/60 rounded-xl overflow-hidden">
+                  <CardHeader className="p-4 border-b border-border bg-secondary/10">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-sm font-bold truncate">{pres.title}</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {new Date(pres.presentationDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} · {pres.presentationTime}
+                        </p>
+                      </div>
+                      <Badge className={`text-[10px] font-bold px-2 py-0.5 border shrink-0 ${pres.status === 'UPCOMING' ? 'bg-teal-500/10 text-teal-600 border-teal-500/20' : 'bg-gray-500/10 text-gray-500 border-gray-400/20'}`}>
+                        {pres.status}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{pres.description}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">{pres._count?.registrations ?? 0} registration(s)</span>
+                      <div className="flex items-center gap-1.5">
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => {
+                          setEditingPresentation(pres);
+                          setPresTitle(pres.title);
+                          setPresDescription(pres.description);
+                          setPresDate(pres.presentationDate.split('T')[0]);
+                          setPresTime(pres.presentationTime);
+                          setPresStatus(pres.status);
+                          setIsEditPresentationModalOpen(true);
+                        }}>
+                          <Edit className="h-3 w-3 mr-1" /> Edit
+                        </Button>
+                        {pres.status === 'UPCOMING' && (
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-amber-600 border-amber-400/40" onClick={() => handleClosePresentation(pres)}>
+                            Close
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-red-500 border-red-400/30" onClick={() => handleDeletePresentation(pres)}>
+                          <Trash className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Registrations Section */}
+        <div>
+          <h2 className="text-base font-bold mb-3 text-foreground">Presentation Registrations ({filteredRegs.length})</h2>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 mb-4">
+            <select
+              className="text-xs border border-border rounded-lg px-3 py-2 bg-background text-foreground"
+              value={presFilterPresentationId}
+              onChange={e => setPresFilterPresentationId(e.target.value)}
+            >
+              <option value="">All Presentations</option>
+              {presentations.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+            <input
+              type="date"
+              className="text-xs border border-border rounded-lg px-3 py-2 bg-background text-foreground"
+              value={presFilterDate}
+              onChange={e => setPresFilterDate(e.target.value)}
+            />
+            {(presFilterPresentationId || presFilterDate) && (
+              <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={() => { setPresFilterPresentationId(''); setPresFilterDate(''); }}>Clear</Button>
+            )}
+          </div>
+
+          {filteredRegs.length === 0 ? (
+            <Card className="border border-border/80 p-10 text-center text-muted-foreground bg-card/50">
+              <FileCheck className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
+              <p className="font-semibold text-sm">No registrations found.</p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filteredRegs.map(reg => (
+                <Card key={reg.id} className="border border-border/80 shadow-xs hover:shadow-md transition-all bg-card/60 rounded-xl">
+                  <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-foreground truncate">{reg.fullName}</p>
+                      <p className="text-xs text-muted-foreground">{reg.intern?.email} · {reg.domain}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Presentation: <span className="font-semibold">{reg.presentation?.title}</span></p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge className={`text-[10px] px-2 py-0.5 border font-bold ${statusColor(reg.status)}`}>{reg.status}</Badge>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => { setSelectedRegistration(reg); setIsRegistrationDetailOpen(true); }}>
+                        <Eye className="h-3 w-3 mr-1" /> View
+                      </Button>
+                      {reg.status === 'PENDING' && (
+                        <>
+                          <Button size="sm" className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleApproveRegistration(reg)} disabled={loading}>
+                            Approve
+                          </Button>
+                          <Button size="sm" variant="destructive" className="h-7 px-2 text-xs" onClick={() => handleRejectRegistration(reg)} disabled={loading}>
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => handleDownloadPdf(reg.id)} disabled={pdfLoadingId === reg.id}>
+                        <Download className="h-3 w-3 mr-1" /> {pdfLoadingId === reg.id ? '...' : 'PDF'}
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Modal: Create Presentation */}
+        <Modal isOpen={isPresentationModalOpen} onClose={() => setIsPresentationModalOpen(false)} title="New Presentation">
+          <form onSubmit={handleCreatePresentation} className="space-y-4 p-1">
+            <Input label="Presentation Title *" placeholder="e.g. Final Year Project Showcase" value={presTitle} onChange={e => setPresTitle(e.target.value)} required />
+            <Textarea label="Description / About the Project *" placeholder="Describe the presentation..." value={presDescription} onChange={e => setPresDescription(e.target.value)} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">Presentation Date *</label>
+                <input type="date" className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground" value={presDate} onChange={e => setPresDate(e.target.value)} required />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">Presentation Time *</label>
+                <input type="time" className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground" value={presTime} onChange={e => setPresTime(e.target.value)} required />
+              </div>
+            </div>
+            <Select label="Status" value={presStatus} onChange={val => setPresStatus(val)} options={[{ value: 'UPCOMING', label: 'Upcoming' }, { value: 'CLOSED', label: 'Closed' }]} />
+            <p className="text-xs text-muted-foreground">Created By: <span className="font-semibold">{user?.name}</span></p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={() => setIsPresentationModalOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={loading}>{loading ? 'Creating...' : 'Publish Presentation'}</Button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Modal: Edit Presentation */}
+        <Modal isOpen={isEditPresentationModalOpen} onClose={() => setIsEditPresentationModalOpen(false)} title="Edit Presentation">
+          <form onSubmit={handleEditPresentation} className="space-y-4 p-1">
+            <Input label="Presentation Title *" value={presTitle} onChange={e => setPresTitle(e.target.value)} required />
+            <Textarea label="Description *" value={presDescription} onChange={e => setPresDescription(e.target.value)} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">Date *</label>
+                <input type="date" className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground" value={presDate} onChange={e => setPresDate(e.target.value)} required />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">Time *</label>
+                <input type="time" className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground" value={presTime} onChange={e => setPresTime(e.target.value)} required />
+              </div>
+            </div>
+            <Select label="Status" value={presStatus} onChange={val => setPresStatus(val)} options={[{ value: 'UPCOMING', label: 'Upcoming' }, { value: 'CLOSED', label: 'Closed' }]} />
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={() => setIsEditPresentationModalOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save Changes'}</Button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Modal: Registration Detail */}
+        <Modal isOpen={isRegistrationDetailOpen} onClose={() => { setIsRegistrationDetailOpen(false); setSelectedRegistration(null); setCoordSignature(''); }} title="Registration Detail">
+          {selectedRegistration && (
+            <div className="space-y-4 text-sm max-h-[70vh] overflow-y-auto px-1">
+              {/* Status + Actions */}
+              <div className="flex items-center justify-between">
+                <Badge className={`text-xs px-3 py-1 border font-bold ${statusColor(selectedRegistration.status)}`}>{selectedRegistration.status}</Badge>
+                <div className="flex gap-2">
+                  {selectedRegistration.status === 'PENDING' && (
+                    <>
+                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={() => handleApproveRegistration(selectedRegistration)} disabled={loading}>Approve</Button>
+                      <Button size="sm" variant="destructive" className="text-xs" onClick={() => handleRejectRegistration(selectedRegistration)} disabled={loading}>Reject</Button>
+                    </>
+                  )}
+                  <Button size="sm" variant="outline" className="text-xs" onClick={() => handleDownloadPdf(selectedRegistration.id)} disabled={pdfLoadingId === selectedRegistration.id}>
+                    <Download className="h-3 w-3 mr-1" />{pdfLoadingId === selectedRegistration.id ? 'Generating...' : 'Download PDF'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Detail rows */}
+              {([
+                ['Presentation', selectedRegistration.presentation?.title],
+                ['Full Name', selectedRegistration.fullName],
+                ['Domain', selectedRegistration.domain],
+                ['College Name', selectedRegistration.collegeName],
+                ['Year of Study', selectedRegistration.yearOfStudy],
+                ['Internship Timing', selectedRegistration.internshipTiming],
+                ['Internship Start', new Date(selectedRegistration.internshipStartDate).toLocaleDateString('en-IN')],
+                ['Internship End', new Date(selectedRegistration.internshipEndDate).toLocaleDateString('en-IN')],
+                ['Purpose', selectedRegistration.purpose],
+                ['Projects Worked On', selectedRegistration.projectsWorkedOn],
+                ['Willing to Attend', selectedRegistration.willingToAttend ? 'Yes' : 'No'],
+                ['Q&A Questions', selectedRegistration.qaQuestions],
+                ['Additional Remarks', selectedRegistration.additionalRemarks || '—'],
+                ['Intern Signature', selectedRegistration.internSignature],
+                ['Coordinator Signature', selectedRegistration.coordinatorSignature || 'Not yet signed'],
+                ['Registered On', new Date(selectedRegistration.createdAt).toLocaleDateString('en-IN')],
+              ] as [string, string | undefined][]).map(([label, val]) => (
+                <div key={label} className="grid grid-cols-5 gap-2 border-b border-border/40 pb-2">
+                  <span className="col-span-2 text-xs font-semibold text-muted-foreground">{label}</span>
+                  <span className="col-span-3 text-xs text-foreground whitespace-pre-wrap">{val ?? '—'}</span>
+                </div>
+              ))}
+
+              {/* Coordinator Signature Input */}
+              <div className="pt-2">
+                <label className="block text-xs font-semibold text-foreground mb-1">Add / Update Coordinator Signature</label>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 text-xs border border-border rounded-lg px-3 py-2 bg-background text-foreground"
+                    placeholder="Your full name or initials as signature"
+                    value={coordSignature}
+                    onChange={e => setCoordSignature(e.target.value)}
+                  />
+                  <Button size="sm" className="text-xs" onClick={() => handleAddSignature(selectedRegistration)} disabled={loading}>Sign</Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 text-left">
       {location.pathname === '/project-coordinator' || location.pathname === '/project-coordinator/' ? renderDashboard() : null}
@@ -3070,6 +3497,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       {location.pathname.startsWith('/project-coordinator/projects') ? renderProjects() : null}
       {location.pathname.startsWith('/project-coordinator/domains') ? renderDomains() : null}
       {location.pathname.startsWith('/project-coordinator/certificates') ? renderCertificates() : null}
+      {location.pathname.startsWith('/project-coordinator/presentations') ? renderPresentationSection() : null}
 
       {/* Modal: New Syllabus / Course */}
       <Modal isOpen={isCourseModalOpen} onClose={() => setIsCourseModalOpen(false)} title="Start New Course Module">

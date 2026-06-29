@@ -4,9 +4,9 @@ import { useAuth } from '../store/AuthContext';
 import { useToast } from '../components/Toast';
 import { Button, Input, Textarea, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Modal, Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui';
 import { VideoPlayer } from '../components/VideoPlayer';
-import { courseService, lessonService, assignmentService, submissionService, quizService, certificateService, projectService, authService } from '../services/apiService';
-import { Course, Lesson, Assignment, Submission, Quiz, QuizResult, Certificate, Project, ProjectRegistration } from '../types';
-import { BookOpen, Award, CheckCircle, Play, FileText, HelpCircle, GraduationCap, ArrowLeft, ArrowRight, ExternalLink, Check, Users, Send, Sparkles, Bot, X, Briefcase, Eye, ChevronDown, ChevronRight, Clock } from 'lucide-react';
+import { courseService, lessonService, assignmentService, submissionService, quizService, certificateService, projectService, authService, presentationService, presentationRegistrationService } from '../services/apiService';
+import { Course, Lesson, Assignment, Submission, Quiz, QuizResult, Certificate, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord } from '../types';
+import { BookOpen, Award, CheckCircle, Play, FileText, HelpCircle, GraduationCap, ArrowLeft, ArrowRight, ExternalLink, Check, Users, Send, Sparkles, Bot, X, Briefcase, Eye, ChevronDown, ChevronRight, Clock, Calendar, Download } from 'lucide-react';
 import { HeroBanner } from '../components/HeroBanner';
 import { getAuthenticatedFileUrl } from '../services/api';
 
@@ -137,6 +137,26 @@ export const InternDashboard: React.FC = () => {
   const [regEmail, setRegEmail] = useState('');
   const [regDomain, setRegDomain] = useState('');
 
+  // ── Presentations state ───────────────────────────────────────────────────
+  const [presentations, setPresentations] = useState<Presentation[]>([]);
+  const [myPresentationRegistrations, setMyPresentationRegistrations] = useState<string[]>([]); // presentationIds registered
+  const [selectedPresentation, setSelectedPresentation] = useState<Presentation | null>(null);
+  const [isPresentationRegModalOpen, setIsPresentationRegModalOpen] = useState(false);
+  // Registration form fields
+  const [prFullName, setPrFullName] = useState('');
+  const [prDomain, setPrDomain] = useState('');
+  const [prCollegeName, setPrCollegeName] = useState('');
+  const [prYearOfStudy, setPrYearOfStudy] = useState('');
+  const [prInternshipTiming, setPrInternshipTiming] = useState('');
+  const [prInternshipStartDate, setPrInternshipStartDate] = useState('');
+  const [prInternshipEndDate, setPrInternshipEndDate] = useState('');
+  const [prPurpose, setPrPurpose] = useState('');
+  const [prProjectsWorkedOn, setPrProjectsWorkedOn] = useState('');
+  const [prWillingToAttend, setPrWillingToAttend] = useState('Yes');
+  const [prQaQuestions, setPrQaQuestions] = useState('');
+  const [prAdditionalRemarks, setPrAdditionalRemarks] = useState('');
+  const [prInternSignature, setPrInternSignature] = useState('');
+
   // Navigation inside dashboard
   const [activeTab, setActiveTab] = useState<'browse' | 'enrolled' | 'certificates'>('enrolled');
   const [activeCourse, setActiveCourse] = useState<Course | null>(null);
@@ -235,6 +255,10 @@ export const InternDashboard: React.FC = () => {
       setCertificates(certs);
       setMyResults(results);
       setProjects(projectsData);
+
+      // Load presentations
+      const presData = await presentationService.getAll().catch(() => []);
+      setPresentations(presData);
 
       const completedMap: Record<string, boolean> = {};
       progress.forEach((pId: string) => {
@@ -1801,12 +1825,252 @@ export const InternDashboard: React.FC = () => {
     );
   };
 
+  // ── renderUpcomingPresentations (Intern) ───────────────────────────────────
+  const renderUpcomingPresentations = () => {
+    const handleOpenRegForm = (pres: Presentation) => {
+      setSelectedPresentation(pres);
+      setPrFullName(user?.name || '');
+      setPrDomain(user?.domain || '');
+      setPrCollegeName(user?.collegeName || '');
+      setPrYearOfStudy('');
+      setPrInternshipTiming('');
+      setPrInternshipStartDate('');
+      setPrInternshipEndDate('');
+      setPrPurpose('');
+      setPrProjectsWorkedOn('');
+      setPrWillingToAttend('Yes');
+      setPrQaQuestions('');
+      setPrAdditionalRemarks('');
+      setPrInternSignature('');
+      setIsPresentationRegModalOpen(true);
+    };
+
+    const handleSubmitRegistration = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedPresentation) return;
+      setLoading(true);
+      try {
+        await presentationRegistrationService.create({
+          presentationId: selectedPresentation.id,
+          fullName: prFullName,
+          domain: prDomain,
+          collegeName: prCollegeName,
+          yearOfStudy: prYearOfStudy,
+          internshipTiming: prInternshipTiming,
+          internshipStartDate: prInternshipStartDate,
+          internshipEndDate: prInternshipEndDate,
+          purpose: prPurpose,
+          projectsWorkedOn: prProjectsWorkedOn,
+          willingToAttend: prWillingToAttend === 'Yes',
+          qaQuestions: prQaQuestions,
+          additionalRemarks: prAdditionalRemarks || undefined,
+          internSignature: prInternSignature,
+        });
+        toast.success('Registration submitted successfully!');
+        setIsPresentationRegModalOpen(false);
+        setMyPresentationRegistrations(prev => [...prev, selectedPresentation.id]);
+        setSelectedPresentation(null);
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || 'Failed to submit registration');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const label = (text: string, required = true) => (
+      <label className="block text-xs font-semibold text-foreground mb-1">
+        {text}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+    );
+
+    const inputCls = "w-full text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-[#0F4C81]/30";
+
+    return (
+      <div className="space-y-6 animate-fade-in text-left">
+        {/* Hero Banner */}
+        <div className="rounded-2xl bg-gradient-to-br from-[#0F4C81] to-[#17A2B8] p-6 text-white shadow-lg">
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/60 mb-1">INTERN · PRESENTATIONS</p>
+          <h1 className="text-2xl font-bold">Upcoming Presentations</h1>
+          <p className="text-sm text-white/80 mt-1">Register for scheduled presentations and showcase your internship journey.</p>
+        </div>
+
+        {presentations.length === 0 ? (
+          <Card className="border border-border/80 p-12 text-center text-muted-foreground bg-card/50">
+            <Award className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+            <p className="font-semibold text-sm">No upcoming presentations at this time.</p>
+            <p className="text-xs mt-1">Check back later or contact your coordinator.</p>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {presentations.map(pres => {
+              const isRegistered = myPresentationRegistrations.includes(pres.id);
+              const isClosed = pres.status === 'CLOSED';
+              return (
+                <Card key={pres.id} className="border border-border/80 shadow-sm hover:shadow-md transition-all bg-card/60 rounded-xl overflow-hidden flex flex-col">
+                  <CardHeader className="p-4 border-b border-border bg-secondary/10">
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="text-sm font-bold leading-tight">{pres.title}</CardTitle>
+                      <Badge className={`text-[10px] shrink-0 font-bold px-2 py-0.5 border ${isClosed ? 'bg-gray-500/10 text-gray-500 border-gray-400/20' : 'bg-teal-500/10 text-teal-600 border-teal-500/20'}`}>
+                        {pres.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(pres.presentationDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{pres.presentationTime}</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 flex-1">
+                    <p className="text-xs text-foreground/80 leading-relaxed line-clamp-3">{pres.description}</p>
+                    {pres.coordinator && (
+                      <p className="text-[10px] text-muted-foreground mt-3 font-semibold">Coordinator: {pres.coordinator.name}</p>
+                    )}
+                  </CardContent>
+                  <div className="p-4 pt-0">
+                    {isRegistered ? (
+                      <Badge className="w-full justify-center py-2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs font-bold">
+                        <Check className="h-3 w-3 mr-1" /> Registered
+                      </Badge>
+                    ) : isClosed ? (
+                      <button disabled className="w-full py-2 rounded-lg text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed">
+                        Registration Closed
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleOpenRegForm(pres)}
+                        className="w-full py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-[#0F4C81] to-[#17A2B8] text-white hover:opacity-90 transition-opacity"
+                      >
+                        Register Now
+                      </button>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Registration Modal */}
+        <Modal
+          isOpen={isPresentationRegModalOpen}
+          onClose={() => setIsPresentationRegModalOpen(false)}
+          title={`Register: ${selectedPresentation?.title}`}
+        >
+          <form onSubmit={handleSubmitRegistration} className="space-y-5 max-h-[70vh] overflow-y-auto px-1 py-1">
+            {/* Section: Personal Information */}
+            <div className="rounded-lg bg-secondary/20 p-4 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C81]">Personal Information</h3>
+              <div>
+                {label('Full Name')}
+                <input className={inputCls} value={prFullName} onChange={e => setPrFullName(e.target.value)} required placeholder="Your full legal name" />
+              </div>
+              <div>
+                {label('Domain')}
+                <input className={inputCls} value={prDomain} onChange={e => setPrDomain(e.target.value)} required placeholder="e.g. Full Stack, AI/ML" />
+              </div>
+              <div>
+                {label('College Name')}
+                <input className={inputCls} value={prCollegeName} onChange={e => setPrCollegeName(e.target.value)} required placeholder="Your college / university name" />
+              </div>
+              <div>
+                {label('Year of Study')}
+                <input className={inputCls} value={prYearOfStudy} onChange={e => setPrYearOfStudy(e.target.value)} required placeholder="e.g. 3rd Year B.E. / Final Year" />
+              </div>
+            </div>
+
+            {/* Section: Internship Information */}
+            <div className="rounded-lg bg-secondary/20 p-4 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C81]">Internship Information</h3>
+              <div>
+                {label('Internship Timing')}
+                <input className={inputCls} value={prInternshipTiming} onChange={e => setPrInternshipTiming(e.target.value)} required placeholder="e.g. 9 AM - 5 PM or Full Day" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  {label('Internship Start Date')}
+                  <input type="date" className={inputCls} value={prInternshipStartDate} onChange={e => setPrInternshipStartDate(e.target.value)} required />
+                </div>
+                <div>
+                  {label('Internship End Date')}
+                  <input type="date" className={inputCls} value={prInternshipEndDate} onChange={e => setPrInternshipEndDate(e.target.value)} required />
+                </div>
+              </div>
+              <div>
+                {label('Purpose of Doing the Internship')}
+                <textarea rows={3} className={inputCls} value={prPurpose} onChange={e => setPrPurpose(e.target.value)} required placeholder="Describe your purpose and learning goals..." />
+              </div>
+              <div>
+                {label('Projects You Worked On')}
+                <textarea rows={3} className={inputCls} value={prProjectsWorkedOn} onChange={e => setPrProjectsWorkedOn(e.target.value)} required placeholder="List the projects you worked on during the internship..." />
+              </div>
+            </div>
+
+            {/* Section: Presentation */}
+            <div className="rounded-lg bg-secondary/20 p-4 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C81]">Presentation</h3>
+              <div>
+                {label('Willing to Attend Project Presentation')}
+                <div className="flex gap-4 mt-1">
+                  {['Yes', 'No'].map(v => (
+                    <label key={v} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="radio" name="willingToAttend" value={v} checked={prWillingToAttend === v} onChange={() => setPrWillingToAttend(v)} className="accent-[#0F4C81]" />
+                      {v}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Q&A */}
+            <div className="rounded-lg bg-secondary/20 p-4 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C81]">Q&amp;A Session</h3>
+              <div>
+                {label('Questions for Q&A Session')}
+                <textarea rows={4} className={inputCls} value={prQaQuestions} onChange={e => setPrQaQuestions(e.target.value)} required placeholder="List your questions for the Q&amp;A session..." />
+              </div>
+            </div>
+
+            {/* Section: Remarks */}
+            <div className="rounded-lg bg-secondary/20 p-4 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C81]">Remarks</h3>
+              <div>
+                {label('Additional Remarks', false)}
+                <textarea rows={2} className={inputCls} value={prAdditionalRemarks} onChange={e => setPrAdditionalRemarks(e.target.value)} placeholder="Optional additional notes..." />
+              </div>
+            </div>
+
+            {/* Section: Signature */}
+            <div className="rounded-lg bg-secondary/20 p-4 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F4C81]">Signature</h3>
+              <div>
+                {label('Intern Signature')}
+                <input className={inputCls} value={prInternSignature} onChange={e => setPrInternSignature(e.target.value)} required placeholder="Type your full name as your digital signature" />
+                <p className="text-[10px] text-muted-foreground mt-1">By entering your name, you confirm the information provided is accurate.</p>
+              </div>
+              <div className="p-3 border border-border/50 rounded-lg bg-background/40">
+                <p className="text-xs font-semibold text-muted-foreground">Coordinator Signature</p>
+                <p className="text-xs text-muted-foreground mt-0.5 italic">To be added by coordinator after review</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setIsPresentationRegModalOpen(false)} className="px-4 py-2 text-xs font-semibold rounded-lg border border-border hover:bg-secondary/50 transition-colors">Cancel</button>
+              <button type="submit" disabled={loading} className="px-6 py-2 text-xs font-bold rounded-lg bg-gradient-to-r from-[#0F4C81] to-[#17A2B8] text-white hover:opacity-90 transition-opacity disabled:opacity-50">
+                {loading ? 'Submitting...' : 'Submit Registration'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 text-left">
       {location.pathname === '/intern' || location.pathname === '/intern/' ? renderDashboard() : null}
       {location.pathname.startsWith('/intern/enrolled') ? renderEnrolled() : null}
       {location.pathname.startsWith('/intern/certificates') ? renderCertificates() : null}
       {location.pathname.startsWith('/intern/projects') ? renderProjects() : null}
+      {location.pathname.startsWith('/intern/presentations') ? renderUpcomingPresentations() : null}
 
       {/* Modal: Assignment Submission Panel */}
       <Modal isOpen={!!selectedAssignment} onClose={() => setSelectedAssignment(null)} title="Assignment Submission Workspace">

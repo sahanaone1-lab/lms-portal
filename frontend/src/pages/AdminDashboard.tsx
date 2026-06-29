@@ -3,10 +3,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
 import { useToast } from '../components/Toast';
 import { Button, Input, Select, Textarea, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Modal, Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui';
-import { userService, courseService, lessonService, assignmentService, quizService, domainService, projectService } from '../services/apiService';
+import { userService, courseService, lessonService, assignmentService, quizService, domainService, projectService, presentationService, presentationRegistrationService } from '../services/apiService';
 import { VideoPlayer } from '../components/VideoPlayer';
-import { User, Course, Role, Lesson, Assignment, Quiz, Question, Domain, Project, ProjectRegistration } from '../types';
-import { Users, BookOpen, GraduationCap, Award, Plus, Trash2, Edit2, ShieldAlert, ListTodo, FileCheck, Check, ChevronDown, ChevronUp, Play, FileText, HelpCircle, Edit, Trash, Eye, X, CheckCircle, Video, Briefcase, Upload, Grid } from 'lucide-react';
+import { User, Course, Role, Lesson, Assignment, Quiz, Question, Domain, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord } from '../types';
+import { Users, BookOpen, GraduationCap, Award, Plus, Trash2, Edit2, ShieldAlert, ListTodo, FileCheck, Check, ChevronDown, ChevronUp, Play, FileText, HelpCircle, Edit, Trash, Eye, X, CheckCircle, Video, Briefcase, Upload, Grid, Download, Search, Calendar } from 'lucide-react';
 import { HeroBanner } from '../components/HeroBanner';
 import { getAuthenticatedFileUrl } from '../services/api';
 
@@ -28,6 +28,16 @@ export const AdminDashboard: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+
+  // Presentations state (Admin: read-only view)
+  const [adminPresentations, setAdminPresentations] = useState<Presentation[]>([]);
+  const [adminPresentationRegs, setAdminPresentationRegs] = useState<PresentationRegistrationRecord[]>([]);
+  const [adminSelectedReg, setAdminSelectedReg] = useState<PresentationRegistrationRecord | null>(null);
+  const [adminRegDetailOpen, setAdminRegDetailOpen] = useState(false);
+  const [adminPresFilter, setAdminPresFilter] = useState('');
+  const [adminInternFilter, setAdminInternFilter] = useState('');
+  const [adminDateFilter, setAdminDateFilter] = useState('');
+  const [adminPdfLoadingId, setAdminPdfLoadingId] = useState<string | null>(null);
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -192,6 +202,13 @@ export const AdminDashboard: React.FC = () => {
       setUsers(usersData);
       setCourses(coursesData);
       setProjects(projectsData);
+
+      // Load presentations
+      const presData = await presentationService.getAll().catch(() => []);
+      const regsData = await presentationRegistrationService.getAll().catch(() => []);
+      setAdminPresentations(presData);
+      setAdminPresentationRegs(regsData);
+
       const projectCoordinators = usersData.filter((u: any) => u.role === 'PROJECT_COORDINATOR');
       if (projectCoordinators.length > 0) {
         setCourseProjectCoordinatorId(projectCoordinators[0].id);
@@ -2285,6 +2302,175 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
+  // ── renderPresentations (Admin — read-only + PDF) ───────────────────────────
+  const renderAdminPresentations = () => {
+    const handleDownloadPdf = async (regId: string) => {
+      setAdminPdfLoadingId(regId);
+      try {
+        await presentationRegistrationService.downloadPdf(regId);
+        toast.success('PDF downloaded!');
+      } catch {
+        toast.error('Failed to generate PDF');
+      } finally {
+        setAdminPdfLoadingId(null);
+      }
+    };
+
+    const statusColor = (s: string) => {
+      if (s === 'APPROVED') return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
+      if (s === 'REJECTED') return 'bg-red-500/10 text-red-600 border-red-500/20';
+      return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+    };
+
+    const filteredRegs = adminPresentationRegs.filter(r => {
+      if (adminPresFilter && r.presentationId !== adminPresFilter) return false;
+      if (adminInternFilter && !r.intern?.name?.toLowerCase().includes(adminInternFilter.toLowerCase()) && !r.intern?.email?.toLowerCase().includes(adminInternFilter.toLowerCase())) return false;
+      if (adminDateFilter && !r.createdAt.startsWith(adminDateFilter)) return false;
+      return true;
+    });
+
+    return (
+      <div className="space-y-6 animate-fade-in text-left">
+        {/* Hero Banner */}
+        <div className="rounded-2xl bg-gradient-to-br from-rose-700 to-rose-500 p-6 text-white shadow-lg">
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/60 mb-1">ADMIN · PRESENTATIONS</p>
+          <h1 className="text-2xl font-bold">Presentation Registrations</h1>
+          <p className="text-sm text-white/80 mt-1">View all intern registrations, filter by presentation or date, and download PDF reports.</p>
+        </div>
+
+        {/* Presentation Overview */}
+        <div>
+          <h2 className="text-sm font-bold mb-3 text-foreground">All Presentations ({adminPresentations.length})</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {adminPresentations.map(pres => (
+              <Card key={pres.id} className="border border-border/80 p-4 bg-card/60 rounded-xl">
+                <p className="text-sm font-bold truncate">{pres.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {new Date(pres.presentationDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} · {pres.presentationTime}
+                </p>
+                <div className="flex items-center justify-between mt-2">
+                  <Badge className={`text-[10px] border font-bold ${pres.status === 'UPCOMING' ? 'bg-teal-500/10 text-teal-600 border-teal-500/20' : 'bg-gray-500/10 text-gray-500 border-gray-400/20'}`}>{pres.status}</Badge>
+                  <span className="text-[10px] text-muted-foreground">{pres._count?.registrations ?? 0} reg(s)</span>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Registrations Table */}
+        <div>
+          <h2 className="text-sm font-bold mb-3 text-foreground">All Registrations ({filteredRegs.length})</h2>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 mb-4">
+            <select
+              className="text-xs border border-border rounded-lg px-3 py-2 bg-background text-foreground"
+              value={adminPresFilter}
+              onChange={e => setAdminPresFilter(e.target.value)}
+            >
+              <option value="">All Presentations</option>
+              {adminPresentations.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+            <input
+              className="text-xs border border-border rounded-lg px-3 py-2 bg-background text-foreground"
+              placeholder="Search intern..."
+              value={adminInternFilter}
+              onChange={e => setAdminInternFilter(e.target.value)}
+            />
+            <input
+              type="date"
+              className="text-xs border border-border rounded-lg px-3 py-2 bg-background text-foreground"
+              value={adminDateFilter}
+              onChange={e => setAdminDateFilter(e.target.value)}
+            />
+            {(adminPresFilter || adminInternFilter || adminDateFilter) && (
+              <button onClick={() => { setAdminPresFilter(''); setAdminInternFilter(''); setAdminDateFilter(''); }} className="text-xs text-primary underline">Clear</button>
+            )}
+          </div>
+
+          {filteredRegs.length === 0 ? (
+            <Card className="border border-border/80 p-10 text-center text-muted-foreground bg-card/50">
+              <FileCheck className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
+              <p className="text-sm font-semibold">No registrations found.</p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filteredRegs.map(reg => (
+                <Card key={reg.id} className="border border-border/80 bg-card/60 rounded-xl">
+                  <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold">{reg.fullName}</p>
+                      <p className="text-xs text-muted-foreground">{reg.intern?.email} · {reg.domain}</p>
+                      <p className="text-xs text-muted-foreground">Presentation: <span className="font-semibold">{reg.presentation?.title}</span></p>
+                      <p className="text-xs text-muted-foreground">Registered: {new Date(reg.createdAt).toLocaleDateString('en-IN')}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge className={`text-[10px] px-2 py-0.5 border font-bold ${statusColor(reg.status)}`}>{reg.status}</Badge>
+                      <button
+                        onClick={() => { setAdminSelectedReg(reg); setAdminRegDetailOpen(true); }}
+                        className="flex items-center gap-1 text-xs border border-border rounded-lg px-2 py-1.5 hover:bg-secondary/50 transition-colors"
+                      >
+                        <Eye className="h-3 w-3" /> View
+                      </button>
+                      <button
+                        onClick={() => handleDownloadPdf(reg.id)}
+                        disabled={adminPdfLoadingId === reg.id}
+                        className="flex items-center gap-1 text-xs border border-border rounded-lg px-2 py-1.5 hover:bg-secondary/50 transition-colors disabled:opacity-50"
+                      >
+                        <Download className="h-3 w-3" /> {adminPdfLoadingId === reg.id ? '...' : 'PDF'}
+                      </button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Registration Detail Modal (read-only) */}
+        <Modal isOpen={adminRegDetailOpen} onClose={() => { setAdminRegDetailOpen(false); setAdminSelectedReg(null); }} title="Registration Detail">
+          {adminSelectedReg && (
+            <div className="space-y-3 text-sm max-h-[70vh] overflow-y-auto px-1">
+              <div className="flex items-center justify-between mb-2">
+                <Badge className={`text-xs px-3 py-1 border font-bold ${statusColor(adminSelectedReg.status)}`}>{adminSelectedReg.status}</Badge>
+                <button
+                  onClick={() => handleDownloadPdf(adminSelectedReg.id)}
+                  disabled={adminPdfLoadingId === adminSelectedReg.id}
+                  className="flex items-center gap-1.5 text-xs border border-border rounded-lg px-3 py-1.5 hover:bg-secondary/50 transition-colors disabled:opacity-50"
+                >
+                  <Download className="h-3 w-3" /> {adminPdfLoadingId === adminSelectedReg.id ? 'Generating...' : 'Download PDF'}
+                </button>
+              </div>
+              {([
+                ['Presentation', adminSelectedReg.presentation?.title],
+                ['Full Name', adminSelectedReg.fullName],
+                ['Domain', adminSelectedReg.domain],
+                ['College Name', adminSelectedReg.collegeName],
+                ['Year of Study', adminSelectedReg.yearOfStudy],
+                ['Internship Timing', adminSelectedReg.internshipTiming],
+                ['Internship Start', new Date(adminSelectedReg.internshipStartDate).toLocaleDateString('en-IN')],
+                ['Internship End', new Date(adminSelectedReg.internshipEndDate).toLocaleDateString('en-IN')],
+                ['Purpose', adminSelectedReg.purpose],
+                ['Projects Worked On', adminSelectedReg.projectsWorkedOn],
+                ['Willing to Attend', adminSelectedReg.willingToAttend ? 'Yes' : 'No'],
+                ['Q&A Questions', adminSelectedReg.qaQuestions],
+                ['Additional Remarks', adminSelectedReg.additionalRemarks || '—'],
+                ['Intern Signature', adminSelectedReg.internSignature],
+                ['Coordinator Signature', adminSelectedReg.coordinatorSignature || 'Pending'],
+                ['Registered On', new Date(adminSelectedReg.createdAt).toLocaleDateString('en-IN')],
+              ] as [string, string | undefined][]).map(([label, val]) => (
+                <div key={label} className="grid grid-cols-5 gap-2 border-b border-border/40 pb-2">
+                  <span className="col-span-2 text-xs font-semibold text-muted-foreground">{label}</span>
+                  <span className="col-span-3 text-xs text-foreground whitespace-pre-wrap">{val ?? '—'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 text-left">
       {location.pathname === '/admin' || location.pathname === '/admin/' ? renderDashboard() : null}
@@ -2292,6 +2478,7 @@ export const AdminDashboard: React.FC = () => {
       {location.pathname.startsWith('/admin/courses') ? renderCourses() : null}
       {location.pathname.startsWith('/admin/domains') ? renderDomains() : null}
       {location.pathname.startsWith('/admin/projects') ? renderProjects() : null}
+      {location.pathname.startsWith('/admin/presentations') ? renderAdminPresentations() : null}
 
       {/* Modal: Confirm Delete User */}
       <Modal isOpen={!!deleteConfirmUser} onClose={() => setDeleteConfirmUser(null)} title="Delete Member Account">

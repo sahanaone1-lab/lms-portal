@@ -13,6 +13,8 @@ import { CertificatesModule } from './certificates/certificates.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { DomainsModule } from './domains/domains.module';
 import { ProjectsModule } from './projects/projects.module';
+import { PresentationsModule } from './presentations/presentations.module';
+import { PresentationRegistrationsModule } from './presentation-registrations/presentation-registrations.module';
 
 @Module({
   imports: [
@@ -28,8 +30,11 @@ import { ProjectsModule } from './projects/projects.module';
     NotificationsModule,
     DomainsModule,
     ProjectsModule,
+    PresentationsModule,
+    PresentationRegistrationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
+

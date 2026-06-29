@@ -50,6 +50,8 @@ model User {
   notifications  Notification[]
   lessonProgress LessonProgress[]
   certificateRequests CertificateRequest[]
+  coordinatorPresentations Presentation[] @relation("CoordinatorPresentations")
+  presentationRegistrations PresentationRegistration[] @relation("InternPresentationRegistrations")
 
   @@map("users")
 }
@@ -228,6 +230,17 @@ enum CertificateRequestStatus {
   REJECTED
 }
 
+enum PresentationStatus {
+  UPCOMING
+  CLOSED
+}
+
+enum PresentationRegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model CertificateRequest {
   id        String                   @id @default(uuid())
   studentId String
@@ -263,4 +276,64 @@ model ProjectRegistration {
 
   @@unique([projectId, internId])
   @@map("project_registrations")
+}
+
+model Presentation {
+  id               String             @id @default(uuid())
+  title            String
+  description      String
+  presentationDate DateTime
+  presentationTime String             // stored as "HH:MM" text
+  status           PresentationStatus @default(UPCOMING)
+  coordinatorId    String
+  coordinator      User               @relation("CoordinatorPresentations", fields: [coordinatorId], references: [id], onDelete: Cascade)
+  isDeleted        Boolean            @default(false)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  registrations    PresentationRegistration[]
+
+  @@map("presentations")
+}
+
+model PresentationRegistration {
+  id                   String                         @id @default(uuid())
+  presentationId       String
+  presentation         Presentation                   @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  internId             String
+  intern               User                           @relation("InternPresentationRegistrations", fields: [internId], references: [id], onDelete: Cascade)
+
+  // Personal Info
+  fullName             String
+  domain               String
+  collegeName          String
+  yearOfStudy          String
+
+  // Internship Info
+  internshipTiming     String
+  internshipStartDate  DateTime
+  internshipEndDate    DateTime
+  purpose              String
+  projectsWorkedOn     String
+
+  // Presentation
+  willingToAttend      Boolean @default(true)
+
+  // Q&A
+  qaQuestions          String
+
+  // Remarks
+  additionalRemarks    String?
+
+  // Signatures
+  internSignature      String
+  coordinatorSignature String?
+
+  // Status
+  status               PresentationRegistrationStatus @default(PENDING)
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([presentationId, internId])
+  @@map("presentation_registrations")
 }

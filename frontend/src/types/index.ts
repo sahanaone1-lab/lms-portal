@@ -206,3 +206,54 @@ export interface ProjectRegistration {
     email: string;
   };
 }
+
+export interface Presentation {
+  id: string;
+  title: string;
+  description: string;
+  presentationDate: string;
+  presentationTime: string;
+  status: 'UPCOMING' | 'CLOSED';
+  coordinatorId: string;
+  coordinator?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  isDeleted?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { registrations: number };
+  registrations?: PresentationRegistrationRecord[];
+}
+
+export interface PresentationRegistrationRecord {
+  id: string;
+  presentationId: string;
+  presentation?: Presentation;
+  internId: string;
+  intern?: {
+    id: string;
+    name: string;
+    email: string;
+    domain?: string;
+  };
+  fullName: string;
+  domain: string;
+  collegeName: string;
+  yearOfStudy: string;
+  internshipTiming: string;
+  internshipStartDate: string;
+  internshipEndDate: string;
+  purpose: string;
+  projectsWorkedOn: string;
+  willingToAttend: boolean;
+  qaQuestions: string;
+  additionalRemarks?: string;
+  internSignature: string;
+  coordinatorSignature?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  updatedAt: string;
+}
+
