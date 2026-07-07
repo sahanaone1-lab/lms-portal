@@ -15,6 +15,7 @@ import { DomainsModule } from './domains/domains.module';
 import { ProjectsModule } from './projects/projects.module';
 import { PresentationsModule } from './presentations/presentations.module';
 import { PresentationRegistrationsModule } from './presentation-registrations/presentation-registrations.module';
+import { AwsModule } from './aws/aws.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { PresentationRegistrationsModule } from './presentation-registrations/pr
     ProjectsModule,
     PresentationsModule,
     PresentationRegistrationsModule,
+    AwsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

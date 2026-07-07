@@ -53,6 +53,7 @@ const express = __importStar(require("express"));
 const path_1 = require("path");
 const fs = __importStar(require("fs"));
 const client_1 = require("@prisma/client");
+const s3_service_1 = require("../aws/s3.service");
 let UploadsAuthGuard = class UploadsAuthGuard extends (0, passport_1.AuthGuard)('jwt') {
     canActivate(context) {
         const request = context.switchToHttp().getRequest();
@@ -69,14 +70,15 @@ exports.UploadsAuthGuard = UploadsAuthGuard = __decorate([
     (0, common_1.Injectable)()
 ], UploadsAuthGuard);
 let UploadsController = class UploadsController {
-    constructor(prisma) {
+    constructor(prisma, s3Service) {
         this.prisma = prisma;
+        this.s3Service = s3Service;
     }
     async serveFile(filename, req, res) {
         const filePath = (0, path_1.join)(process.cwd(), 'uploads', filename);
-        if (!fs.existsSync(filePath)) {
-            throw new common_1.NotFoundException('File not found');
-        }
+        let isLocalFile = fs.existsSync(filePath);
+        // If neither local nor S3 file, the S3Service will just throw an error or we can check later.
+        // We will check auth first regardless.
         const user = req.user;
         // If it is a project file
         if (filename.startsWith('file-')) {
@@ -114,6 +116,15 @@ let UploadsController = class UploadsController {
                 }
             }
         }
+        if (!isLocalFile) {
+            try {
+                const s3Url = await this.s3Service.getPresignedUrl(filename);
+                return res.redirect(s3Url);
+            }
+            catch (err) {
+                throw new common_1.NotFoundException('File not found in local storage or S3');
+            }
+        }
         res.setHeader('Content-Disposition', 'inline');
         return res.sendFile(filePath);
     }
@@ -131,6 +142,7 @@ __decorate([
 ], UploadsController.prototype, "serveFile", null);
 exports.UploadsController = UploadsController = __decorate([
     (0, common_1.Controller)('uploads'),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        s3_service_1.S3Service])
 ], UploadsController);
 //# sourceMappingURL=uploads.controller.js.map

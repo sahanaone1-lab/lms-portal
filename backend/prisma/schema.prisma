@@ -337,3 +337,13 @@ model PresentationRegistration {
   @@unique([presentationId, internId])
   @@map("presentation_registrations")
 }
+
+model ContactMessage {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@map("contact_messages")
+}

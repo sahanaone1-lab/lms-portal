@@ -18,14 +18,18 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
+import { diskStorage, memoryStorage } from 'multer';
 import { extname } from 'path';
 import * as fs from 'fs';
+import { S3Service } from '../aws/s3.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('courses')
 export class CoursesController {
-  constructor(private coursesService: CoursesService) { }
+  constructor(
+    private coursesService: CoursesService,
+    private s3Service: S3Service,
+  ) { }
 
   @Get('enrolled')
   @Roles(Role.INTERN)
@@ -37,20 +41,7 @@ export class CoursesController {
   @Roles(Role.PROJECT_COORDINATOR, Role.ADMIN)
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: (req, file, cb) => {
-          if (!fs.existsSync('./uploads')) {
-            fs.mkdirSync('./uploads', { recursive: true });
-          }
-          cb(null, './uploads');
-        },
-        filename: (req, file, callback) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
-          callback(null, `brochure-${uniqueSuffix}${ext}`);
-        },
-      }),
+      storage: memoryStorage(),
       limits: {},
       fileFilter: (req, file, callback) => {
         const ext = extname(file.originalname).toLowerCase();
@@ -68,7 +59,11 @@ export class CoursesController {
     @UploadedFile() file: any,
   ) {
     if (!file) throw new BadRequestException('No brochure file uploaded');
-    const fileUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/uploads/${file.filename}`;
+    
+    // Upload to S3 directly
+    const s3ObjectKey = await this.s3Service.uploadFile(file);
+    const fileUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/uploads/${encodeURIComponent(s3ObjectKey)}`;
+
     return this.coursesService.uploadBrochure(
       id,
       fileUrl,

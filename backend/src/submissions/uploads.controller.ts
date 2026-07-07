@@ -16,6 +16,7 @@ import * as express from 'express';
 import { join } from 'path';
 import * as fs from 'fs';
 import { Role } from '@prisma/client';
+import { S3Service } from '../aws/s3.service';
 
 @Injectable()
 export class UploadsAuthGuard extends AuthGuard('jwt') {
@@ -34,7 +35,10 @@ export class UploadsAuthGuard extends AuthGuard('jwt') {
 
 @Controller('uploads')
 export class UploadsController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private s3Service: S3Service,
+  ) {}
 
   @Get(':filename')
   @UseGuards(UploadsAuthGuard)
@@ -44,9 +48,10 @@ export class UploadsController {
     @Res() res: express.Response,
   ) {
     const filePath = join(process.cwd(), 'uploads', filename);
-    if (!fs.existsSync(filePath)) {
-      throw new NotFoundException('File not found');
-    }
+    let isLocalFile = fs.existsSync(filePath);
+
+    // If neither local nor S3 file, the S3Service will just throw an error or we can check later.
+    // We will check auth first regardless.
 
     const user = req.user;
 
@@ -89,6 +94,15 @@ export class UploadsController {
             'Unauthorized access to this project file',
           );
         }
+      }
+    }
+
+    if (!isLocalFile) {
+      try {
+        const s3Url = await this.s3Service.getPresignedUrl(filename);
+        return res.redirect(s3Url);
+      } catch (err) {
+        throw new NotFoundException('File not found in local storage or S3');
       }
     }
 
