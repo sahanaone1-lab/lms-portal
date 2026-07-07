@@ -1884,67 +1884,6 @@ export const InternDashboard: React.FC = () => {
     );
   };
 
-  const renderProjects = () => {
-    return (
-      <div className="space-y-6 text-left animate-fade-in">
-        <HeroBanner
-          title="Presentation Registration"
-          subtitle="Milestones"
-          description={`Explore available topics/projects in your domain (${user?.domain || 'N/A'}) and register your interest for presentations.`}
-          icon={Briefcase}
-          badgeText="PROJECTS"
-          badgeSubText="INTERN"
-        />
-
-        {/* Projects List */}
-        {projects.length === 0 ? (
-          <Card className="border border-border/80 p-12 text-center text-muted-foreground bg-card/50">
-            <Briefcase className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-            <p className="font-semibold text-sm">No projects currently available.</p>
-            <p className="text-xs text-muted-foreground mt-1">Please check back later or contact your projectCoordinator.</p>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((p) => (
-              <Card key={p.id} className="border border-border/80 shadow-xs hover:border-[#0F4C81]/30 hover:shadow-md transition-all overflow-hidden flex flex-col justify-between bg-card/60 rounded-xl">
-                <div>
-                  <CardHeader className="p-5 border-b border-border bg-secondary/10 flex flex-col items-start gap-2">
-                    <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20">
-                      {p.domain}
-                    </Badge>
-                    <CardTitle className="text-base font-bold text-foreground font-display leading-tight">{p.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-5 flex-1">
-                    <h4 className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider mb-1.5 font-display">Description</h4>
-                    <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed">{p.description}</p>
-                  </CardContent>
-                </div>
-                <div className="p-5 pt-4 border-t border-border/40 flex items-center justify-between bg-secondary/5 mt-auto">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider font-display">Project Coordinator</span>
-                    <span className="text-xs font-bold text-foreground">{p.projectCoordinator?.name || 'Academy'}</span>
-                  </div>
-                  {p.isRegistered ? (
-                    <Badge variant="success" className="text-xs h-9 px-3 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-bold flex items-center gap-1.5 rounded-lg">
-                      <Check className="h-3.5 w-3.5" /> Registered
-                    </Badge>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => handleOpenRegisterModal(p)}
-                      className="text-xs h-9 bg-gradient-to-r from-[#0F4C81] to-[#17A2B8] text-white hover:from-[#17A2B8] hover:to-[#0F4C81] font-semibold cursor-pointer shadow-sm hover:shadow hover:-translate-y-0.5 transition-all rounded-lg"
-                    >
-                      Register Interest
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   // ── renderUpcomingPresentations (Intern) ───────────────────────────────────
   const renderUpcomingPresentations = () => {
