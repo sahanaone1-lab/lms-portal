@@ -1491,7 +1491,7 @@ export const AdminDashboard: React.FC = () => {
                     </CardHeader>
                     <CardContent className="p-0">
                       <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
+                        <div className="overflow-x-auto w-full"><table className="w-full text-left text-xs">
                           <thead>
                             <tr className="border-b border-border text-muted-foreground uppercase tracking-wider font-semibold bg-secondary/10">
                               <th className="p-3">Name & Role</th>
@@ -1552,7 +1552,7 @@ export const AdminDashboard: React.FC = () => {
                                 </tr>
                               ))}
                           </tbody>
-                        </table>
+                        </table></div>
                       </div>
                     </CardContent>
                   </Card>
@@ -1569,7 +1569,7 @@ export const AdminDashboard: React.FC = () => {
                     </CardHeader>
                     <CardContent className="p-0">
                       <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
+                        <div className="overflow-x-auto w-full"><table className="w-full text-left text-xs">
                           <thead>
                             <tr className="border-b border-border text-muted-foreground uppercase tracking-wider font-semibold bg-secondary/10">
                               <th className="p-3">Name & Domain</th>
@@ -1622,7 +1622,7 @@ export const AdminDashboard: React.FC = () => {
                                 </tr>
                               ))}
                           </tbody>
-                        </table>
+                        </table></div>
                       </div>
                     </CardContent>
                   </Card>
@@ -1636,7 +1636,7 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
+                    <div className="overflow-x-auto w-full"><table className="w-full text-left text-sm">
                       <thead>
                         <tr className="border-b border-border text-muted-foreground text-xs uppercase tracking-wider font-semibold bg-secondary/20">
                           <th className="p-4">Name</th>
@@ -1672,7 +1672,7 @@ export const AdminDashboard: React.FC = () => {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
+                    </table></div>
                   </div>
                 )}
               </TabsContent>
@@ -2137,7 +2137,7 @@ export const AdminDashboard: React.FC = () => {
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto w-full"><table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-border text-muted-foreground uppercase tracking-wider font-semibold bg-secondary/10">
                     <th className="p-4">Domain Name</th>
@@ -2213,7 +2213,7 @@ export const AdminDashboard: React.FC = () => {
                     </tr>
                   )}
                 </tbody>
-              </table>
+              </table></div>
             </div>
           </CardContent>
         </Card>
@@ -2221,86 +2221,6 @@ export const AdminDashboard: React.FC = () => {
     );
   };
 
-  const renderProjects = () => {
-    return (
-      <div className="space-y-6 animate-fade-in text-left">
-        <HeroBanner
-          title="Presentation Registration"
-          subtitle="Presentations Portal"
-          description="Review all posted presentations, domains, and the lists of registered interns."
-          icon={Briefcase}
-          badgeText="PROJECTS"
-          badgeSubText="ADMIN"
-        />
-
-        {/* Projects List */}
-        {projects.length === 0 ? (
-          <Card className="border border-border/80 p-12 text-center text-muted-foreground bg-card/50">
-            <Briefcase className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-            <p className="font-semibold text-sm">No projects created yet.</p>
-            <p className="text-xs text-muted-foreground mt-1">Project Coordinators will post projects here once they are available.</p>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 gap-6">
-            {projects.map((p) => (
-              <Card key={p.id} className="border border-border/80 shadow-xs hover:border-[#0F4C81]/30 transition-all overflow-hidden bg-card/60 rounded-xl">
-                <CardHeader className="p-5 border-b border-border bg-secondary/20 flex flex-row items-center justify-between space-y-0">
-                  <div>
-                    <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider mb-2 bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20">
-                      {p.domain}
-                    </Badge>
-                    <CardTitle className="text-lg font-bold text-foreground font-display">{p.title}</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Posted by: <span className="font-semibold text-foreground">{p.projectCoordinator?.name || 'Academy'}</span> ({p.projectCoordinator?.email || 'N/A'})
-                    </p>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-5 space-y-5">
-                  <div>
-                    <h4 className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider mb-1.5 font-display">Description</h4>
-                    <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed">{p.description}</p>
-                  </div>
-
-                  <div className="pt-4 border-t border-border/60">
-                    <h4 className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider mb-3 font-display flex items-center gap-1.5">
-                      <Users className="h-4 w-4 text-teal-600" />
-                      Registered Interns ({p.registrations?.length || 0})
-                    </h4>
-                    {!p.registrations || p.registrations.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic bg-secondary/15 rounded-lg p-3">No interns have registered interest for this project yet.</p>
-                    ) : (
-                      <div className="overflow-x-auto rounded-xl border border-border/60">
-                        <table className="w-full text-left border-collapse">
-                          <thead>
-                            <tr className="bg-secondary/40 border-b border-border/60">
-                              <th className="px-4 py-2.5 text-xs font-bold text-muted-foreground uppercase font-display">Name</th>
-                              <th className="px-4 py-2.5 text-xs font-bold text-muted-foreground uppercase font-display">Email</th>
-                              <th className="px-4 py-2.5 text-xs font-bold text-muted-foreground uppercase font-display">Registered At</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {p.registrations.map((reg) => (
-                              <tr key={reg.id} className="border-b border-border/40 hover:bg-secondary/10 transition-colors">
-                                <td className="px-4 py-2.5 text-xs font-semibold text-foreground">{reg.intern?.name || 'N/A'}</td>
-                                <td className="px-4 py-2.5 text-xs text-muted-foreground">{reg.intern?.email || 'N/A'}</td>
-                                <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                                  {reg.registeredAt ? new Date(reg.registeredAt).toLocaleString() : 'N/A'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   // ── renderPresentations (Admin — read-only + PDF) ───────────────────────────
   const renderAdminPresentations = () => {
@@ -2459,7 +2379,7 @@ export const AdminDashboard: React.FC = () => {
                 ['Coordinator Signature', adminSelectedReg.coordinatorSignature || 'Pending'],
                 ['Registered On', new Date(adminSelectedReg.createdAt).toLocaleDateString('en-IN')],
               ] as [string, string | undefined][]).map(([label, val]) => (
-                <div key={label} className="grid grid-cols-5 gap-2 border-b border-border/40 pb-2">
+                <div key={label} className="grid grid-cols-1 md:grid-cols-5 gap-2 border-b border-border/40 pb-2">
                   <span className="col-span-2 text-xs font-semibold text-muted-foreground">{label}</span>
                   <span className="col-span-3 text-xs text-foreground whitespace-pre-wrap">{val ?? '—'}</span>
                 </div>
@@ -2477,7 +2397,6 @@ export const AdminDashboard: React.FC = () => {
       {location.pathname.startsWith('/admin/users') ? renderUsers() : null}
       {location.pathname.startsWith('/admin/courses') ? renderCourses() : null}
       {location.pathname.startsWith('/admin/domains') ? renderDomains() : null}
-      {location.pathname.startsWith('/admin/projects') ? renderProjects() : null}
       {location.pathname.startsWith('/admin/presentations') ? renderAdminPresentations() : null}
 
       {/* Modal: Confirm Delete User */}
@@ -3251,7 +3170,7 @@ export const AdminDashboard: React.FC = () => {
           <Input label="Video URL (Optional)" placeholder="e.g. https://youtube.com/watch?v=..." value={lessonVideo} onChange={(e) => setLessonVideo(e.target.value)} />
           <Input label="PDF Resource Link (Optional)" placeholder="e.g. https://drive.google.com/file/..." value={lessonPdf} onChange={(e) => setLessonPdf(e.target.value)} />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Duration" placeholder="e.g. 10 mins" value={lessonDuration} onChange={(e) => setLessonDuration(e.target.value)} />
             <Input label="Chapter Index (Order)" type="number" value={lessonOrder} onChange={(e) => setLessonOrder(e.target.value)} />
           </div>
@@ -3271,7 +3190,7 @@ export const AdminDashboard: React.FC = () => {
           <Input label="Task Title" placeholder="e.g. Build dynamic state store" value={assignmentTitle} onChange={(e) => setAssignmentTitle(e.target.value)} />
           <Input label="Reference File Link (PDF/URL)" placeholder="e.g. https://drive.google.com/..." value={assignmentAttachment} onChange={(e) => setAssignmentAttachment(e.target.value)} />
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input label="Due Date" type="date" value={assignmentDue} onChange={(e) => setAssignmentDue(e.target.value)} />
             <Input label="Maximum Marks" type="number" value={assignmentMaxMarks} onChange={(e) => setAssignmentMaxMarks(e.target.value)} />
             <Select
@@ -3301,7 +3220,7 @@ export const AdminDashboard: React.FC = () => {
         <form onSubmit={handleSaveQuiz} className="space-y-4">
           <Input label="Quiz Title" placeholder="e.g. Midterm TypeScript Review" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Passing Threshold (%)" type="number" min="0" max="100" value={quizPassing} onChange={(e) => setQuizPassing(e.target.value)} />
             <Input label="Time Limit (minutes)" type="number" min="1" value={quizTimeLimit} onChange={(e) => setQuizTimeLimit(e.target.value)} />
           </div>
@@ -3342,7 +3261,7 @@ export const AdminDashboard: React.FC = () => {
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Options & Correct Marks:</p>
 
                   {q.type === 'TF' ? (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {q.options.map((opt, oIdx) => (
                         <label key={oIdx} className="flex items-center gap-2 p-2 border border-border rounded-lg bg-background cursor-pointer hover:bg-secondary/10 text-xs">
                           <input

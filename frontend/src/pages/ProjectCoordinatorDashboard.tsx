@@ -1212,7 +1212,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
         />
 
         {/* Domain Analytics Stats Grid — 5 cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card className="p-4 flex items-center space-x-3">
             <div className="p-2.5 bg-primary/10 text-primary rounded-xl flex-shrink-0">
               <BookOpen className="h-5 w-5" />
@@ -1370,7 +1370,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto w-full"><table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-border text-muted-foreground uppercase tracking-wider font-semibold bg-secondary/10">
                     <th className="p-3">Intern Name</th>
@@ -1413,7 +1413,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
             </div>
           )}
         </Card>
@@ -2164,7 +2164,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <div className="overflow-x-auto w-full"><table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold bg-slate-50/50 sticky top-0">
                       <th className="p-4">Intern Name</th>
@@ -2242,7 +2242,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                       </tr>
                     )}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             </CardContent>
           </Card>
@@ -2307,7 +2307,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
+                  <div className="overflow-x-auto w-full"><table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold bg-slate-50/50 sticky top-0">
                         <th className="p-4">Student Name</th>
@@ -2388,7 +2388,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                         );
                       })}
                     </tbody>
-                  </table>
+                  </table></div>
                 </div>
               )}
             </CardContent>
@@ -2532,7 +2532,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           </div>
 
           {/* Analytics Statistics Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 flex items-center space-x-3 rounded-premium shadow-premium bg-white border border-slate-100/80 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(13,161,181,0.05)] transition-all duration-300">
               <div className="p-2.5 bg-[#0F4C81]/10 text-[#0F4C81] rounded-xl flex-shrink-0">
                 <Users className="h-5 w-5" />
@@ -2581,7 +2581,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <div className="overflow-x-auto w-full"><table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold bg-slate-50/50">
                       <th className="p-4">Course Name</th>
@@ -2613,7 +2613,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                       </tr>
                     )}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             </CardContent>
           </Card>
@@ -2636,7 +2636,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <div className="overflow-x-auto w-full"><table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-500 uppercase tracking-wider font-bold bg-slate-50/50">
                       <th className="p-4">Intern Name</th>
@@ -2716,7 +2716,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                       </tr>
                     )}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             </CardContent>
           </Card>
@@ -2757,7 +2757,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="pt-2 pb-5">
-                  <div className="grid grid-cols-2 gap-4 border-t border-b border-slate-50 py-3.5 my-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-b border-slate-50 py-3.5 my-1">
                     <div>
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none text-left">Total Interns</span>
                       <span className="text-base font-extrabold text-slate-700 mt-1 block tabular-nums text-left">{stats.totalInterns}</span>
@@ -2830,7 +2830,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <table className="w-full text-xs text-left border-collapse">
+              <div className="overflow-x-auto w-full"><table className="w-full text-xs text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                     <th className="p-4">Intern Details</th>
@@ -2903,7 +2903,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </div>
         </Card>
@@ -2956,135 +2956,6 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     });
   };
 
-  const renderProjects = () => {
-    return (
-      <div className="space-y-6 animate-fade-in text-left">
-        <HeroBanner
-          title="Project Presentation Portal"
-          subtitle="Schedule presentations"
-          description="Upload domain-specific presentations and view intern interest."
-          isCoordinator={true}
-          extraContent={
-            <div className="flex flex-wrap items-center gap-3 mt-2">
-              <Button
-                onClick={() => {
-                  setProjectDomain(user?.domain || 'Full Stack');
-                  setIsProjectModalOpen(true);
-                }}
-                className="flex items-center gap-1.5 h-10 px-4 text-xs font-bold rounded-xl bg-white text-[#0F4C81] hover:bg-white/90 cursor-pointer shadow-md hover:shadow-lg transition-all"
-              >
-                <Plus className="h-4 w-4" /> Post Project
-              </Button>
-            </div>
-          }
-        />
-
-        {/* Projects List */}
-        {projects.length === 0 ? (
-          <Card className="border border-border/80 p-12 text-center text-muted-foreground bg-card/50">
-            <Briefcase className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-            <p className="font-semibold text-sm">No projects created yet.</p>
-            <p className="text-xs text-muted-foreground mt-1">Click "Post Project" to upload a new project for interns.</p>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 gap-6">
-            {projects.map((p) => (
-              <Card key={p.id} className="border border-border/80 shadow-xs hover:border-[#0F4C81]/30 transition-all overflow-hidden bg-card/60">
-                <CardHeader className="p-5 border-b border-border bg-secondary/20 flex flex-row items-center justify-between space-y-0">
-                  <div>
-                    <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider mb-2 bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20">
-                      {p.domain}
-                    </Badge>
-                    <CardTitle className="text-lg font-bold text-foreground font-display">{p.title}</CardTitle>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteProject(p.id)}
-                    className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 rounded-lg cursor-pointer"
-                  >
-                    <Trash className="h-4 w-4" />
-                  </Button>
-                </CardHeader>
-                <CardContent className="p-5 space-y-5">
-                  <div>
-                    <h4 className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider mb-1.5 font-display">Description</h4>
-                    <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed">{p.description}</p>
-                  </div>
-
-                  <div className="pt-4 border-t border-border/60">
-                    <h4 className="text-xs font-extrabold uppercase text-muted-foreground tracking-wider mb-3 font-display flex items-center gap-1.5">
-                      <Users className="h-4 w-4 text-teal-600" />
-                      Registered Interns ({p.registrations?.length || 0})
-                    </h4>
-                    {!p.registrations || p.registrations.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic bg-secondary/15 rounded-lg p-3">No interns have registered interest for this project yet.</p>
-                    ) : (
-                      <div className="overflow-x-auto rounded-xl border border-border/60">
-                        <table className="w-full text-left border-collapse">
-                          <thead>
-                            <tr className="bg-secondary/40 border-b border-border/60">
-                              <th className="px-4 py-2.5 text-xs font-bold text-muted-foreground uppercase font-display">Name</th>
-                              <th className="px-4 py-2.5 text-xs font-bold text-muted-foreground uppercase font-display">Email</th>
-                              <th className="px-4 py-2.5 text-xs font-bold text-muted-foreground uppercase font-display">Registered At</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {p.registrations.map((reg) => (
-                              <tr key={reg.id} className="border-b border-border/40 hover:bg-secondary/10 transition-colors">
-                                <td className="px-4 py-2.5 text-xs font-semibold text-foreground">{reg.intern?.name || 'N/A'}</td>
-                                <td className="px-4 py-2.5 text-xs text-muted-foreground">{reg.intern?.email || 'N/A'}</td>
-                                <td className="px-4 py-2.5 text-xs text-muted-foreground">{formatLastActivity(reg.registeredAt)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {/* Modal: Add Project */}
-        <Modal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} title="Post New Project">
-          <form onSubmit={handleCreateProject} className="space-y-4">
-            <Input
-              label="Project Title"
-              placeholder="e.g. Real-Time Chat Application"
-              value={projectTitle}
-              onChange={(e) => setProjectTitle(e.target.value)}
-              required
-            />
-            <Textarea
-              label="Project Description"
-              placeholder="Outline project requirements, key deliverables, and technologies to use..."
-              value={projectDesc}
-              onChange={(e) => setProjectDesc(e.target.value)}
-              required
-              rows={5}
-            />
-            <Select
-              label="Domain"
-              value={projectDomain}
-              onChange={(val) => setProjectDomain(val)}
-              options={domains.map((d) => ({ value: d.name, label: d.name }))}
-            />
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button variant="ghost" type="button" onClick={() => setIsProjectModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                Post Project
-              </Button>
-            </div>
-          </form>
-        </Modal>
-      </div>
-    );
-  };
 
   // ── renderPresentations ───────────────────────────────────────────────────
   const renderPresentationSection = () => {
@@ -3382,7 +3253,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           <form onSubmit={handleCreatePresentation} className="space-y-4 p-1">
             <Input label="Presentation Title *" placeholder="e.g. Final Year Project Showcase" value={presTitle} onChange={e => setPresTitle(e.target.value)} required />
             <Textarea label="Description / About the Project *" placeholder="Describe the presentation..." value={presDescription} onChange={e => setPresDescription(e.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">Presentation Date *</label>
                 <input type="date" className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground" value={presDate} onChange={e => setPresDate(e.target.value)} required />
@@ -3406,7 +3277,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           <form onSubmit={handleEditPresentation} className="space-y-4 p-1">
             <Input label="Presentation Title *" value={presTitle} onChange={e => setPresTitle(e.target.value)} required />
             <Textarea label="Description *" value={presDescription} onChange={e => setPresDescription(e.target.value)} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">Date *</label>
                 <input type="date" className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground" value={presDate} onChange={e => setPresDate(e.target.value)} required />
@@ -3463,7 +3334,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                 ['Coordinator Signature', selectedRegistration.coordinatorSignature || 'Not yet signed'],
                 ['Registered On', new Date(selectedRegistration.createdAt).toLocaleDateString('en-IN')],
               ] as [string, string | undefined][]).map(([label, val]) => (
-                <div key={label} className="grid grid-cols-5 gap-2 border-b border-border/40 pb-2">
+                <div key={label} className="grid grid-cols-1 md:grid-cols-5 gap-2 border-b border-border/40 pb-2">
                   <span className="col-span-2 text-xs font-semibold text-muted-foreground">{label}</span>
                   <span className="col-span-3 text-xs text-foreground whitespace-pre-wrap">{val ?? '—'}</span>
                 </div>
@@ -3494,7 +3365,6 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       {location.pathname === '/project-coordinator' || location.pathname === '/project-coordinator/' ? renderDashboard() : null}
       {location.pathname.startsWith('/project-coordinator/courses') ? renderCourses() : null}
       {location.pathname.startsWith('/project-coordinator/grading') ? renderGrading() : null}
-      {location.pathname.startsWith('/project-coordinator/projects') ? renderProjects() : null}
       {location.pathname.startsWith('/project-coordinator/domains') ? renderDomains() : null}
       {location.pathname.startsWith('/project-coordinator/certificates') ? renderCertificates() : null}
       {location.pathname.startsWith('/project-coordinator/presentations') ? renderPresentationSection() : null}
@@ -3505,7 +3375,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           <Input label="Course Name" placeholder="e.g. NextJS Complete Architecture" value={courseTitle} onChange={(e) => setCourseTitle(e.target.value)} />
           <Textarea label="Brief Summary" placeholder="Scope, duration, and prerequisites..." value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select
               label="Domain"
               value={courseDomain}
@@ -3524,7 +3394,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Category" placeholder="e.g. Frontend Web / AI" value={courseCategory} onChange={(e) => setCourseCategory(e.target.value)} />
             <Input label="Estimated Duration" placeholder="e.g. 4 Weeks / 10 Hours" value={courseDuration} onChange={(e) => setCourseDuration(e.target.value)} />
           </div>
@@ -3551,7 +3421,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           <Input label="Course Name" placeholder="e.g. NextJS Complete Architecture" value={courseTitle} onChange={(e) => setCourseTitle(e.target.value)} />
           <Textarea label="Brief Summary" placeholder="Scope, duration, and prerequisites..." value={courseDesc} onChange={(e) => setCourseDesc(e.target.value)} />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select
               label="Domain"
               value={courseDomain}
@@ -3570,7 +3440,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Category" placeholder="e.g. Frontend Web / AI" value={courseCategory} onChange={(e) => setCourseCategory(e.target.value)} />
             <Input label="Estimated Duration" placeholder="e.g. 4 Weeks / 10 Hours" value={courseDuration} onChange={(e) => setCourseDuration(e.target.value)} />
           </div>
@@ -3601,7 +3471,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           <Input label="Video URL (Optional)" placeholder="e.g. https://youtube.com/watch?v=..." value={lessonVideo} onChange={(e) => setLessonVideo(e.target.value)} />
           <Input label="PDF Resource Link (Optional)" placeholder="e.g. https://drive.google.com/file/..." value={lessonPdf} onChange={(e) => setLessonPdf(e.target.value)} />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Duration" placeholder="e.g. 10 mins" value={lessonDuration} onChange={(e) => setLessonDuration(e.target.value)} />
             <Input label="Chapter Index (Order)" type="number" value={lessonOrder} onChange={(e) => setLessonOrder(e.target.value)} />
           </div>
@@ -3621,7 +3491,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           <Input label="Task Title" placeholder="e.g. Build dynamic state store" value={assignmentTitle} onChange={(e) => setAssignmentTitle(e.target.value)} />
           <Input label="Reference File Link (PDF/URL)" placeholder="e.g. https://drive.google.com/..." value={assignmentAttachment} onChange={(e) => setAssignmentAttachment(e.target.value)} />
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input label="Due Date" type="date" value={assignmentDue} onChange={(e) => setAssignmentDue(e.target.value)} />
             <Input label="Maximum Marks" type="number" value={assignmentMaxMarks} onChange={(e) => setAssignmentMaxMarks(e.target.value)} />
             <Select
@@ -3651,7 +3521,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
         <form onSubmit={handleSaveQuiz} className="space-y-4">
           <Input label="Quiz Title" placeholder="e.g. Midterm TypeScript Review" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input label="Passing Threshold (%)" type="number" min="0" max="100" value={quizPassing} onChange={(e) => setQuizPassing(e.target.value)} />
             <Input label="Time Limit (minutes)" type="number" min="1" value={quizTimeLimit} onChange={(e) => setQuizTimeLimit(e.target.value)} />
           </div>
@@ -3692,7 +3562,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Options & Correct Marks:</p>
 
                   {q.type === 'TF' ? (
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {q.options.map((opt, oIdx) => (
                         <label key={oIdx} className="flex items-center gap-2 p-2 border border-border rounded-lg bg-background cursor-pointer hover:bg-secondary/10 text-xs">
                           <input
@@ -3969,7 +3839,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                     </span>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     <div className="text-left">
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none">Student Name</span>
                       <span className="font-semibold text-slate-800 mt-1 block">{selectedSub.studentName}</span>
@@ -4095,7 +3965,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
             </div>
 
             {/* Overall stats */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="p-3 border border-border/75 rounded-lg text-center bg-secondary/5">
                 <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Overall Completion</p>
                 <p className="text-lg font-black text-primary mt-1">{selectedReportProgress.percentage}%</p>

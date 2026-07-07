@@ -2,9 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>Career Solution</title>
+    <script>
+      (function() {
+        const img = new Image();
+        img.src = '/logo.png';
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          canvas.width = 64;
+          canvas.height = 64;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, 64, 64);
+            const scale = Math.min(52 / img.width, 52 / img.height);
+            const w = img.width * scale;
+            const h = img.height * scale;
+            const x = (64 - w) / 2;
+            const y = (64 - h) / 2;
+            ctx.drawImage(img, x, y, w, h);
+            
+            const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+            link.type = 'image/x-icon';
+            link.rel = 'icon';
+            link.href = canvas.toDataURL('image/x-icon');
+            document.getElementsByTagName('head')[0].appendChild(link);
+          }
+        };
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

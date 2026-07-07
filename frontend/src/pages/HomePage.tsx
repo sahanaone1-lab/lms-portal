@@ -415,6 +415,7 @@ export const HomePage: React.FC = () => {
     { icon: <Code2 className="h-8 w-8" />, title: 'Full Stack Development', desc: 'Learn HTML, CSS, JavaScript, React, APIs and backend integration to build production-grade web applications.', color: 'domain-card-fs', weeks: 'Week 1: HTML, CSS, JS · Week 2: React & Backend APIs' },
     { icon: <ShieldCheck className="h-8 w-8" />, title: 'Cybersecurity', desc: 'Understand network security fundamentals, ethical hacking techniques, and vulnerability assessment methods.', color: 'domain-card-cs', weeks: 'Week 1: Network Security · Week 2: Ethical Hacking' },
     { icon: <Megaphone className="h-8 w-8" />, title: 'Digital Marketing', desc: 'Drive online growth through SEO, SEM, content strategy, social media campaigns, and analytics mastery.', color: 'domain-card-dm', weeks: 'Week 1: SEO Fundamentals · Week 2: Social Media Marketing' },
+    { icon: <Layers className="h-8 w-8" />, title: 'UI/UX Design', desc: 'Master Figma design software, wireframing, interactive prototyping, and user testing to craft delightful interfaces.', color: 'domain-card-uiux', weeks: 'Week 1: UX Principles · Week 2: UI Design & Figma' },
   ];
 
   const stats = [
@@ -464,11 +465,20 @@ export const HomePage: React.FC = () => {
     { label: 'Contact',  href: '#contact' },
   ];
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setContactSent(true);
-    setTimeout(() => setContactSent(false), 4000);
-    setContactForm({ name: '', email: '', message: '' });
+    try {
+      await axios.post(`${API_URL}/contact`, contactForm);
+      setContactSent(true);
+      setTimeout(() => setContactSent(false), 4000);
+      
+      // Open email client with details
+      window.location.href = `mailto:hr@carrersolution.com?subject=Contact from ${encodeURIComponent(contactForm.name)}&body=${encodeURIComponent(contactForm.message + '\n\nFrom: ' + contactForm.email)}`;
+      
+      setContactForm({ name: '', email: '', message: '' });
+    } catch (err) {
+      console.error('Failed to submit contact form', err);
+    }
   };
 
   return (
@@ -615,9 +625,6 @@ export const HomePage: React.FC = () => {
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </button>
             </a>
-            <button onClick={() => navigate('/login')} className="flex items-center gap-2 px-8 py-4 rounded-xl border border-slate-200 dark:border-white/20 text-slate-800 dark:text-white font-semibold text-sm hover:bg-slate-100 dark:hover:bg-white/10 hover:border-slate-350 dark:hover:border-white/40 transition-all cursor-pointer shadow-xs">
-              Access Portal
-            </button>
           </div>
 
           {/* Quick stats ribbon */}
@@ -648,7 +655,7 @@ export const HomePage: React.FC = () => {
             <p className="text-slate-500 dark:text-white/55 max-w-xl mx-auto text-sm sm:text-base">5 industry-aligned tracks designed to build real skills through hands-on projects and expert mentorship.</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5">
             {domains.map((d, i) => (
               <div key={d.title} className={`scroll-reveal delay-${Math.min(i * 100 + 100, 500)} group relative rounded-2xl p-6 overflow-hidden cursor-pointer transition-all duration-500 hover:-translate-y-2 bg-slate-50/80 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 hover:border-[#0F4C81]/30 dark:hover:border-[#0F4C81]/30 hover:shadow-xl dark:hover:shadow-[#0F4C81]/5`}>
                 {/* Shimmer overlay */}
@@ -660,21 +667,7 @@ export const HomePage: React.FC = () => {
                   <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white mb-2">{d.title}</h3>
                   <p className="text-slate-650 dark:text-white/65 text-xs leading-relaxed mb-4">{d.desc}</p>
                   <p className="text-slate-400 dark:text-white/45 text-[10px] mb-5 leading-relaxed">{d.weeks}</p>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const brochure = getBrochureForDomain(d.title);
-                        setSelectedDomainForBrochure({ title: d.title, brochure });
-                      }}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-[#0F4C81] bg-[#0F4C81]/15 hover:bg-[#0F4C81]/25 border border-[#0F4C81]/30 px-4 py-2 rounded-xl transition-all w-full justify-center cursor-pointer"
-                    >
-                      <BookOpen className="h-3 w-3" /> View Curriculum
-                    </button>
-                    <button onClick={() => navigate('/login')} className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-white bg-slate-200/55 dark:bg-white/15 hover:bg-slate-200/85 dark:hover:bg-white/25 px-4 py-2 rounded-xl transition-all w-full justify-center cursor-pointer">
-                      Access Domain <ArrowRight className="h-3 w-3" />
-                    </button>
-                  </div>
+
                 </div>
               </div>
             ))}
@@ -739,13 +732,7 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
 
-          {/* CTA */}
-          <div className="text-center mt-16 scroll-reveal">
-            <button onClick={() => navigate('/login')} className="group inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-[#0F4C81] to-[#17A2B8] text-white font-semibold text-sm hover:shadow-2xl hover:shadow-[#0F4C81]/30 transition-all hover:-translate-y-1 cursor-pointer">
-              Access LMS Portal
-              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </div>
+
         </div>
       </section>
 
@@ -810,9 +797,9 @@ export const HomePage: React.FC = () => {
             {/* Contact Info */}
             <div className="scroll-reveal-left space-y-6">
               {[
-                { icon: <Mail className="h-5 w-5 text-[#0F4C81]" />, label: 'Email', value: 'info@careersolutions.com' },
-                { icon: <Phone className="h-5 w-5 text-[#0F4C81]" />, label: 'Phone', value: '+91 98765 43210' },
-                { icon: <MapPin className="h-5 w-5 text-[#0F4C81]" />, label: 'Location', value: 'Chennai, Tamil Nadu, India' },
+                { icon: <Mail className="h-5 w-5 text-[#0F4C81]" />, label: 'Email', value: 'hr@carrersolution.com' },
+                { icon: <Phone className="h-5 w-5 text-[#0F4C81]" />, label: 'Phone', value: '+91 6381479170' },
+                { icon: <MapPin className="h-5 w-5 text-[#0F4C81]" />, label: 'Location', value: 'Anna Nagar, Chennai-40' },
               ].map(c => (
                 <div key={c.label} className="flex items-center gap-4 bg-white dark:bg-white/5 rounded-2xl p-5 border border-slate-200/60 dark:border-white/8 shadow-sm dark:shadow-none">
                   <div className="w-10 h-10 rounded-xl bg-[#0F4C81]/15 border border-[#0F4C81]/20 flex items-center justify-center flex-shrink-0">{c.icon}</div>
@@ -949,9 +936,9 @@ export const HomePage: React.FC = () => {
             <div>
               <h4 className="font-display font-bold text-sm text-white mb-4 uppercase tracking-wider">Contact</h4>
               <ul className="space-y-3">
-                <li className="flex items-center gap-2 text-white/45 text-xs"><Mail className="h-3.5 w-3.5 text-[#0F4C81]" /> info@careersolutions.com</li>
-                <li className="flex items-center gap-2 text-white/45 text-xs"><Phone className="h-3.5 w-3.5 text-[#0F4C81]" /> +91 98765 43210</li>
-                <li className="flex items-center gap-2 text-white/45 text-xs"><MapPin className="h-3.5 w-3.5 text-[#0F4C81]" /> Chennai, Tamil Nadu</li>
+                <li className="flex items-center gap-2 text-white/45 text-xs"><Mail className="h-3.5 w-3.5 text-[#0F4C81]" /> hr@carrersolution.com</li>
+                <li className="flex items-center gap-2 text-white/45 text-xs"><Phone className="h-3.5 w-3.5 text-[#0F4C81]" /> +91 6381479170</li>
+                <li className="flex items-center gap-2 text-white/45 text-xs"><MapPin className="h-3.5 w-3.5 text-[#0F4C81]" /> Anna Nagar, Chennai-40</li>
               </ul>
             </div>
           </div>
@@ -982,14 +969,6 @@ export const HomePage: React.FC = () => {
         <CurriculumModal
           curriculum={curriculumData[activeCurriculum]}
           onClose={() => setActiveCurriculum(null)}
-        />
-      )}
-
-      {selectedDomainForBrochure && (
-        <BrochureModal
-          domainTitle={selectedDomainForBrochure.title}
-          brochure={selectedDomainForBrochure.brochure}
-          onClose={() => setSelectedDomainForBrochure(null)}
         />
       )}
     </div>

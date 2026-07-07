@@ -84,7 +84,7 @@ export const ChangePassword: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-secondary/10 px-4 py-12 relative overflow-hidden text-left">
+    <div className="min-h-screen flex items-center justify-center bg-secondary/10 dark:bg-[#06111e] px-4 py-12 relative overflow-hidden text-left">
       {/* Background blobs */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
@@ -184,7 +184,7 @@ export const ChangePassword: React.FC = () => {
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
                   Password Requirements:
                 </p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <RuleRow label="Min 8 Characters" passed={checks.length} />
                   <RuleRow label="1 Uppercase Letter" passed={checks.uppercase} />
                   <RuleRow label="1 Lowercase Letter" passed={checks.lowercase} />

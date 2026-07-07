@@ -171,16 +171,13 @@ export const DashboardLayout: React.FC = () => {
     { title: 'Manage Users', path: '/admin/users', icon: Users, roles: ['ADMIN'] },
     { title: 'Manage Courses', path: '/admin/courses', icon: BookOpen, roles: ['ADMIN'] },
     { title: 'Domain Management', path: '/admin/domains', icon: Grid, roles: ['ADMIN'] },
-    { title: 'Presentation Registration', path: '/admin/projects', icon: Briefcase, roles: ['ADMIN'] },
     { title: 'Presentation Registrations', path: '/admin/presentations', icon: Award, roles: ['ADMIN'] },
     { title: 'My Courses', path: '/project-coordinator/courses', icon: BookOpen, roles: ['PROJECT_COORDINATOR'] },
     { title: 'Grades', path: '/project-coordinator/grading', icon: FileCheck, roles: ['PROJECT_COORDINATOR'] },
-    { title: 'Presentation Registration', path: '/project-coordinator/projects', icon: Briefcase, roles: ['PROJECT_COORDINATOR'] },
-    { title: 'Presentations', path: '/project-coordinator/presentations', icon: Award, roles: ['PROJECT_COORDINATOR'] },
+    { title: 'Upcoming Presentations', path: '/project-coordinator/presentations', icon: Award, roles: ['PROJECT_COORDINATOR'] },
     { title: 'Certificate Requests', path: '/project-coordinator/certificates', icon: Award, roles: ['PROJECT_COORDINATOR'] },
     { title: 'Domains', path: '/project-coordinator/domains', icon: Grid, roles: ['PROJECT_COORDINATOR'] },
     { title: 'My Enrolled Courses', path: '/intern/enrolled', icon: GraduationCap, roles: ['INTERN'] },
-    { title: 'Presentation Registration', path: '/intern/projects', icon: Briefcase, roles: ['INTERN'] },
     { title: 'Upcoming Presentations', path: '/intern/presentations', icon: Award, roles: ['INTERN'] },
     { title: 'My Certificates', path: '/intern/certificates', icon: FileCheck, roles: ['INTERN'] }
   ];
@@ -216,8 +213,6 @@ export const DashboardLayout: React.FC = () => {
         return 'Manage Courses';
       case '/admin/domains':
         return 'Domain Management';
-      case '/admin/projects':
-        return 'Presentation Registration';
       case '/admin/presentations':
         return 'Presentation Registrations';
 
@@ -228,10 +223,8 @@ export const DashboardLayout: React.FC = () => {
         return 'My Courses';
       case '/project-coordinator/grading':
         return 'Grades';
-      case '/project-coordinator/projects':
-        return 'Presentation Registration';
       case '/project-coordinator/presentations':
-        return 'Presentations';
+        return 'Upcoming Presentations';
       case '/project-coordinator/domains':
         return 'Domains';
       case '/project-coordinator/certificates':
@@ -244,8 +237,6 @@ export const DashboardLayout: React.FC = () => {
         return 'Browse Curriculum';
       case '/intern/enrolled':
         return 'My Enrolled Courses';
-      case '/intern/projects':
-        return 'Presentation Registration';
       case '/intern/presentations':
         return 'Upcoming Presentations';
       case '/intern/certificates':
@@ -281,23 +272,23 @@ export const DashboardLayout: React.FC = () => {
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white dark:bg-[#0b1a2e] border-r border-slate-100 dark:border-slate-800/80 flex flex-col transition-transform duration-300 ease-in-out shadow-lg md:shadow-none md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
 
         {/* Logo Header - Zoomed CS Logo Icon + Career Solutions Stacked Text */}
-        <div className="flex items-center justify-between h-24 px-5 border-b border-slate-100 dark:border-slate-800/80 flex-shrink-0">
-          <Link to="/" className="flex items-center gap-3.5 w-full min-w-0">
-            <div className="dark-logo-wrapper square-logo h-18 w-18 rounded-2xl flex-shrink-0 overflow-hidden flex items-center justify-center">
+        <div className="relative flex items-center justify-between h-24 px-4 sm:px-5 border-b border-slate-100 dark:border-slate-800/80 flex-shrink-0">
+          <Link to="/" className="flex items-center gap-3 min-w-0 pr-8">
+            <div className="dark-logo-wrapper square-logo h-14 w-14 sm:h-16 sm:w-16 rounded-2xl flex-shrink-0 overflow-hidden flex items-center justify-center">
               <img src="/logo.png" alt="CS Logo" className="h-full w-full object-contain scale-110" />
             </div>
-            <div className="flex flex-col text-left leading-none select-none gap-1">
-              <span className="text-[19px] font-black font-display text-slate-800 dark:text-white tracking-widest uppercase">
+            <div className="flex flex-col text-left leading-none select-none gap-1 min-w-0">
+              <span className="text-[17px] sm:text-[19px] font-black font-display text-slate-800 dark:text-white tracking-widest uppercase truncate">
                 Career
               </span>
-              <span className="text-[13px] font-black font-display text-[#0F4C81] dark:text-blue-400 tracking-widest uppercase">
+              <span className="text-[11px] sm:text-[13px] font-black font-display text-[#0F4C81] dark:text-blue-400 tracking-widest uppercase truncate">
                 Solutions
               </span>
             </div>
           </Link>
           <button
             onClick={() => setIsSidebarOpen(false)}
-            className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors flex-shrink-0"
+            className="md:hidden absolute top-1/2 -translate-y-1/2 right-3 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors flex-shrink-0 bg-white/80 dark:bg-[#0b1a2e]/80 backdrop-blur-sm"
           >
             <X className="h-5 w-5" />
           </button>
@@ -363,19 +354,22 @@ export const DashboardLayout: React.FC = () => {
 
         {/* Top Header */}
         <header className="h-24 md:h-26 flex items-center justify-between px-4 md:px-8 bg-white dark:bg-[#0b1a2e] border-b border-slate-100 dark:border-slate-800/80 z-20 flex-shrink-0 shadow-sm transition-all duration-200">
-          {/* Left Side: Mobile Menu Trigger only */}
-          <div className="flex items-center">
+          {/* Left Side: Mobile Menu Trigger and Mobile Title */}
+          <div className="flex items-center gap-2 flex-1 md:flex-none">
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+              className="md:hidden p-2 -ml-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors flex-shrink-0"
             >
               <Menu className="h-6 w-6" />
             </button>
+            <span className="md:hidden text-sm sm:text-base font-black font-display text-[#0c3d6e] dark:text-blue-300 tracking-tight uppercase truncate select-none">
+              {currentPageTitle}
+            </span>
           </div>
 
-          {/* Center: Current Page Title in a larger, bold font aligned vertically */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center pointer-events-none select-none">
-            <span className="text-lg md:text-3xl font-black font-display text-[#0c3d6e] dark:text-blue-300 tracking-tight uppercase truncate max-w-[200px] sm:max-w-xs md:max-w-md lg:max-w-none">
+          {/* Center: Current Page Title (Desktop Only) */}
+          <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center pointer-events-none select-none">
+            <span className="text-3xl font-black font-display text-[#0c3d6e] dark:text-blue-300 tracking-tight uppercase truncate max-w-md lg:max-w-none">
               {currentPageTitle}
             </span>
           </div>
@@ -504,7 +498,7 @@ export const DashboardLayout: React.FC = () => {
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-y-auto bg-[#F8FAFC] dark:bg-[#06111e]">
+        <main className={`flex-1 ${isSidebarOpen ? 'overflow-hidden' : 'overflow-y-auto'} bg-[#F8FAFC] dark:bg-[#06111e]`}>
           <div className="p-5 md:p-6 max-w-[1600px] mx-auto animate-fade-in">
             <Outlet />
           </div>

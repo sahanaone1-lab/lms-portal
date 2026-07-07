@@ -6,9 +6,100 @@ import { Button, Input, Textarea, Card, CardHeader, CardTitle, CardDescription, 
 import { VideoPlayer } from '../components/VideoPlayer';
 import { courseService, lessonService, assignmentService, submissionService, quizService, certificateService, projectService, authService, presentationService, presentationRegistrationService } from '../services/apiService';
 import { Course, Lesson, Assignment, Submission, Quiz, QuizResult, Certificate, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord } from '../types';
-import { BookOpen, Award, CheckCircle, Play, FileText, HelpCircle, GraduationCap, ArrowLeft, ArrowRight, ExternalLink, Check, Users, Send, Sparkles, Bot, X, Briefcase, Eye, ChevronDown, ChevronRight, Clock, Calendar, Download } from 'lucide-react';
+import { BookOpen, Award, CheckCircle, Play, FileText, HelpCircle, GraduationCap, ArrowLeft, ArrowRight, ExternalLink, Check, Users, Send, Sparkles, Bot, X, Briefcase, Eye, ChevronDown, ChevronRight, Clock, Calendar, Download, Menu } from 'lucide-react';
 import { HeroBanner } from '../components/HeroBanner';
 import { getAuthenticatedFileUrl } from '../services/api';
+
+// Centered Secure PDF Modal component with dims, ~20% responsive margins, and security features
+interface SecurePdfModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  pdfUrl: string;
+}
+
+const SecurePdfModal: React.FC<SecurePdfModalProps> = ({ isOpen, onClose, title, pdfUrl }) => {
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent Print (Ctrl+P / Cmd+P) and Save (Ctrl+S / Cmd+S)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P' || e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        alert('Downloading and printing are disabled for secure documents.');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  // Append toolbar parameter to prevent pdf tools from showing
+  const secureUrl = `${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0`;
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  return (
+    <div 
+      className="secure-pdf-modal-backdrop"
+      onClick={onClose}
+      onContextMenu={handleContextMenu}
+    >
+      <div 
+        className="secure-pdf-modal animate-fade-in"
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={handleContextMenu}
+        onDragStart={handleDragStart}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border/50 p-4 bg-white dark:bg-slate-900 sticky top-0 z-20">
+          <h3 className="text-sm font-bold font-display text-slate-800 dark:text-slate-100 truncate pr-4">
+            {title}
+          </h3>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1.5 hover:bg-secondary text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+          >
+            ✕ Close
+          </button>
+        </div>
+
+        {/* Content Wrapper */}
+        <div 
+          className="flex-1 relative bg-slate-100 dark:bg-slate-950 flex flex-col justify-stretch select-none"
+          onContextMenu={handleContextMenu}
+        >
+          {/* Cover the right click / actions */}
+          <iframe
+            src={secureUrl}
+            title={title}
+            onContextMenu={(e) => e.preventDefault()}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 
 interface ProjectSubmissionFormProps {
@@ -128,14 +219,11 @@ export const InternDashboard: React.FC = () => {
   const toast = useToast();
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
+  const [securePdfOpen, setSecurePdfOpen] = useState(false);
+  const [securePdfUrl, setSecurePdfUrl] = useState('');
+  const [securePdfTitle, setSecurePdfTitle] = useState('');
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [myResults, setMyResults] = useState<QuizResult[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isRegModalOpen, setIsRegModalOpen] = useState(false);
-  const [selectedProjectToReg, setSelectedProjectToReg] = useState<Project | null>(null);
-  const [regName, setRegName] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regDomain, setRegDomain] = useState('');
 
   // ── Presentations state ───────────────────────────────────────────────────
   const [presentations, setPresentations] = useState<Presentation[]>([]);
@@ -168,6 +256,7 @@ export const InternDashboard: React.FC = () => {
   const [activeProjectWeekId, setActiveProjectWeekId] = useState<string | null>(null);
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [expandedLessonId, setExpandedLessonId] = useState<string | null>(null);
+  const [isCourseDrawerOpen, setIsCourseDrawerOpen] = useState(false);
 
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean;
@@ -248,13 +337,10 @@ export const InternDashboard: React.FC = () => {
       const results = await quizService.getMyResults().catch(() => []);
       const subs = await submissionService.getMySubmissions().catch(() => []);
       const progress = await lessonService.getProgress().catch(() => []);
-      const projectsData = await projectService.getAll().catch(() => []);
-
       setAllCourses(domainCourses);
       setEnrolledCourses(enrolled);
       setCertificates(certs);
       setMyResults(results);
-      setProjects(projectsData);
 
       // Load presentations
       const presData = await presentationService.getAll().catch(() => []);
@@ -294,28 +380,6 @@ export const InternDashboard: React.FC = () => {
     }
   };
 
-  const handleOpenRegisterModal = (project: Project) => {
-    setSelectedProjectToReg(project);
-    setRegName(user?.name || '');
-    setRegEmail(user?.email || '');
-    setRegDomain(user?.domain || '');
-    setIsRegModalOpen(true);
-  };
-
-  const handleRegSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedProjectToReg) return;
-    try {
-      await updateProfile(regName, regEmail, regDomain);
-      await projectService.register(selectedProjectToReg.id);
-      toast.success('Interest registered successfully!');
-      setIsRegModalOpen(false);
-      setSelectedProjectToReg(null);
-      await loadInternData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to register interest.');
-    }
-  };
 
   const handleOpenStudyMode = async (course: Course) => {
     setLoading(true);
@@ -1057,7 +1121,7 @@ export const InternDashboard: React.FC = () => {
                   }`}
               >
                 <Bot className="h-4 w-4 text-teal-500" />
-                {showAiAssistant ? 'Hide AI' : 'AI Assistant'}
+                {showAiAssistant ? 'Hide Chatbot' : 'Chatbot'}
               </button>
             </div>
             {activeCourse.domain && (
@@ -1228,32 +1292,81 @@ export const InternDashboard: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button
-                    onClick={() => window.open(activeCourse.brochureUrl, '_blank')}
+                    onClick={() => {
+                      setSecurePdfUrl(getAuthenticatedFileUrl(activeCourse.brochureUrl));
+                      setSecurePdfTitle(`${activeCourse.title} - Brochure`);
+                      setSecurePdfOpen(true);
+                    }}
                     className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-[#0F4C81]/30 bg-[#EAF4F8] dark:bg-[#0F4C81]/20 text-[#0F4C81] dark:text-blue-400 hover:bg-[#0F4C81]/10 transition-colors"
                   >
                     <Eye className="h-3.5 w-3.5" />
                     View
                   </button>
-                  <a href={getAuthenticatedFileUrl(activeCourse.brochureUrl)} download
-                    className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-[#0F4C81] text-white hover:bg-[#1B6CA8] transition-colors shadow-sm">
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Download
-                  </a>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── TWO-COLUMN LEARNING LAYOUT ── */}
-          <div className="flex gap-4 items-start">
+          {/* Mobile Course Modules Trigger */}
+          <div className="lg:hidden mb-4">
+            <button
+              onClick={() => setIsCourseDrawerOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm text-sm font-bold text-slate-700 dark:text-slate-300 w-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Menu className="h-5 w-5 text-[#0F4C81] dark:text-blue-400" />
+              COURSE MODULES
+            </button>
+          </div>
 
-            {/* LEFT COLUMN — Module List (30%) — sticky */}
-            <div className="w-[30%] flex-shrink-0 sticky top-4">
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                <div className="px-4 py-3.5 border-b border-slate-100 dark:border-slate-800">
+          {/* ── TWO-COLUMN LEARNING LAYOUT ── */}
+          <div className="flex gap-4 items-start relative">
+
+            {/* Mobile Drawer Overlay */}
+            {isCourseDrawerOpen && (
+              <div 
+                className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+                onClick={() => setIsCourseDrawerOpen(false)}
+              />
+            )}
+
+            {/* LEFT COLUMN — Module List (Drawer on Mobile, Sidebar on Desktop) */}
+            <div className={`
+              fixed inset-y-0 left-0 z-50 w-[80%] max-w-sm transform transition-transform duration-300 ease-in-out
+              ${isCourseDrawerOpen ? 'translate-x-0' : '-translate-x-full'}
+              lg:static lg:translate-x-0 lg:w-[30%] lg:flex-shrink-0 lg:sticky lg:top-4 lg:z-auto
+            `}>
+              <div className="bg-white dark:bg-slate-900 lg:rounded-2xl border-r lg:border border-slate-200 dark:border-slate-700 shadow-xl lg:shadow-sm overflow-hidden h-full lg:h-auto flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 dark:border-slate-800 flex-shrink-0">
                   <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Course Modules</h3>
+                  <button 
+                    onClick={() => setIsCourseDrawerOpen(false)}
+                    className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[calc(100vh-400px)] overflow-y-auto">
+
+                {/* Progress Summary */}
+                {(() => {
+                  const details = getWeekProgressDetails(activeCourse);
+                  return (
+                    <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 flex-shrink-0 bg-slate-50/50 dark:bg-slate-800/30">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Progress</span>
+                        <span className="text-xs font-black text-[#0F4C81] dark:text-blue-400">{details.percentage}%</span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mb-3">
+                        <div className="bg-[#0F4C81] dark:bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${details.percentage}%` }} />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
+                        <span><span className="text-slate-700 dark:text-slate-300">{details.completedWeeks}</span> DONE</span>
+                        <span><span className="text-slate-700 dark:text-slate-300">{details.remainingWeeks}</span> LEFT</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 lg:max-h-[calc(100vh-400px)]">
                   {weeks.map((week, wIdx) => {
                     const isSelected = activeModuleId === week.id;
                     const isCompleted = isWeekCompleted(week.id, activeCourse);
@@ -1268,6 +1381,7 @@ export const InternDashboard: React.FC = () => {
                         onClick={() => {
                           setActiveModuleId(week.id);
                           setExpandedLessonId(null);
+                          setIsCourseDrawerOpen(false);
                           if (isProject) { setActiveProjectWeekId(week.id); setActiveLesson(null); }
                           else { setActiveProjectWeekId(null); setActiveLesson(null); }
                         }}
@@ -1335,7 +1449,7 @@ export const InternDashboard: React.FC = () => {
                         </div>
                         <span className="text-xs font-bold text-[#0F4C81] dark:text-blue-400 flex-shrink-0">{details.percentage}%</span>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div className="bg-white dark:bg-slate-800 rounded-xl p-2.5 text-center border border-slate-100 dark:border-slate-700">
                           <p className="text-base font-bold text-slate-800 dark:text-slate-200">{details.completedWeeks}</p>
                           <p className="text-[9px] text-slate-400 uppercase font-semibold mt-0.5">Done</p>
@@ -1454,11 +1568,18 @@ export const InternDashboard: React.FC = () => {
                                   <div className="p-2 bg-rose-50 dark:bg-rose-950/30 rounded-lg border border-rose-200/60 dark:border-rose-900/40 flex-shrink-0"><FileText className="h-4 w-4 text-rose-500" /></div>
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Study Material / PDF</p>
-                                    <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{lesson.attachmentUrl}</p>
+                                    <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{lesson.title} - Study Guide</p>
                                   </div>
-                                  <a href={getAuthenticatedFileUrl(lesson.attachmentUrl)} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-[#0F4C81] dark:text-blue-400 bg-[#EAF4F8] dark:bg-[#0F4C81]/20 border border-[#0F4C81]/20 hover:bg-[#0F4C81]/10 transition-colors">
-                                    <ExternalLink className="h-3 w-3" /> View
-                                  </a>
+                                  <button
+                                    onClick={() => {
+                                      setSecurePdfUrl(getAuthenticatedFileUrl(lesson.attachmentUrl));
+                                      setSecurePdfTitle(`${lesson.title} - Study Material`);
+                                      setSecurePdfOpen(true);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-[#0F4C81] dark:text-blue-400 bg-[#EAF4F8] dark:bg-[#0F4C81]/20 border border-[#0F4C81]/20 hover:bg-[#0F4C81]/10 transition-colors cursor-pointer"
+                                  >
+                                    <Eye className="h-3 w-3" /> View
+                                  </button>
                                 </div>
                               )}
                               <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
@@ -1546,14 +1667,14 @@ export const InternDashboard: React.FC = () => {
               {showAiAssistant && (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col" style={{ maxHeight: '520px' }}>
                   <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-teal-50/80 to-white dark:from-teal-950/20 dark:to-slate-900">
-                    <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-teal-500 animate-pulse" /><span className="text-sm font-bold text-slate-800 dark:text-slate-100">AI Tutor</span></div>
+                    <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-teal-500 animate-pulse" /><span className="text-sm font-bold text-slate-800 dark:text-slate-100">AI Chatbot</span></div>
                     <button onClick={() => setShowAiAssistant(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"><X className="h-3.5 w-3.5" /></button>
                   </div>
                   <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
                     {aiChatMessages.map((msg) => (
                       <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] rounded-xl p-2.5 text-xs leading-relaxed ${msg.sender === 'user' ? 'bg-[#0F4C81] text-white rounded-tr-none' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tl-none'}`}>
-                          {msg.sender === 'ai' && <div className="text-[9px] font-bold uppercase text-teal-600 dark:text-teal-400 mb-1 flex items-center gap-1"><Bot className="h-3 w-3" /> AI Tutor</div>}
+                          {msg.sender === 'ai' && <div className="text-[9px] font-bold uppercase text-teal-600 dark:text-teal-400 mb-1 flex items-center gap-1"><Bot className="h-3 w-3" /> AI Chatbot</div>}
                           <p className="whitespace-pre-wrap">{msg.text}</p>
                         </div>
                       </div>
@@ -1984,7 +2105,7 @@ export const InternDashboard: React.FC = () => {
                 {label('Internship Timing')}
                 <input className={inputCls} value={prInternshipTiming} onChange={e => setPrInternshipTiming(e.target.value)} required placeholder="e.g. 9 AM - 5 PM or Full Day" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   {label('Internship Start Date')}
                   <input type="date" className={inputCls} value={prInternshipStartDate} onChange={e => setPrInternshipStartDate(e.target.value)} required />
@@ -2069,7 +2190,6 @@ export const InternDashboard: React.FC = () => {
       {location.pathname === '/intern' || location.pathname === '/intern/' ? renderDashboard() : null}
       {location.pathname.startsWith('/intern/enrolled') ? renderEnrolled() : null}
       {location.pathname.startsWith('/intern/certificates') ? renderCertificates() : null}
-      {location.pathname.startsWith('/intern/projects') ? renderProjects() : null}
       {location.pathname.startsWith('/intern/presentations') ? renderUpcomingPresentations() : null}
 
       {/* Modal: Assignment Submission Panel */}
@@ -2254,61 +2374,6 @@ export const InternDashboard: React.FC = () => {
         )}
       </Modal>
 
-      {/* Modal: Project Registration Form */}
-      <Modal isOpen={isRegModalOpen} onClose={() => { setIsRegModalOpen(false); setSelectedProjectToReg(null); }} title="Register for Project">
-        {selectedProjectToReg && (
-          <form onSubmit={handleRegSubmit} className="space-y-4">
-            <div className="p-4 border border-border/80 bg-secondary/15 rounded-lg text-left">
-              <span className="text-[10px] uppercase font-bold text-teal-600 tracking-wider">Project Selection</span>
-              <h4 className="text-sm font-bold text-foreground mt-0.5">{selectedProjectToReg.title}</h4>
-              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{selectedProjectToReg.description}</p>
-            </div>
-
-            <Input
-              label="Full Name"
-              placeholder="Enter your name"
-              value={regName}
-              onChange={(e) => setRegName(e.target.value)}
-              required
-            />
-
-            <Input
-              label="Email Address"
-              type="email"
-              placeholder="Enter your email"
-              value={regEmail}
-              onChange={(e) => setRegEmail(e.target.value)}
-              required
-            />
-
-            <div className="space-y-1.5 text-left">
-              <label className="block text-xs font-semibold text-muted-foreground uppercase">Domain</label>
-              <select
-                value={regDomain}
-                onChange={(e) => setRegDomain(e.target.value)}
-                className="w-full bg-background border border-border rounded-lg p-2.5 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
-                required
-              >
-                <option value="" disabled>Select your domain</option>
-                <option value="Full Stack">Full Stack</option>
-                <option value="Data Science">Data Science</option>
-                <option value="Machine Learning">Machine Learning</option>
-                <option value="Cyber Security">Cyber Security</option>
-                <option value="Digital Marketing">Digital Marketing</option>
-              </select>
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4 border-t border-border/50">
-              <Button variant="ghost" type="button" onClick={() => { setIsRegModalOpen(false); setSelectedProjectToReg(null); }}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                Submit Registration
-              </Button>
-            </div>
-          </form>
-        )}
-      </Modal>
 
       {/* Modal: Confirm Delete General */}
       {deleteConfirm && (
@@ -2337,6 +2402,17 @@ export const InternDashboard: React.FC = () => {
           </div>
         </Modal>
       )}
+      {/* Modal: Secure PDF Viewer */}
+      <SecurePdfModal
+        isOpen={securePdfOpen}
+        onClose={() => {
+          setSecurePdfOpen(false);
+          setSecurePdfUrl('');
+          setSecurePdfTitle('');
+        }}
+        title={securePdfTitle}
+        pdfUrl={securePdfUrl}
+      />
     </div>
   );
 };
