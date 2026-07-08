@@ -9,6 +9,14 @@ import { Course, Lesson, Assignment, Submission, Quiz, QuizResult, Certificate, 
 import { BookOpen, Award, CheckCircle, Play, FileText, HelpCircle, GraduationCap, ArrowLeft, ArrowRight, ExternalLink, Check, Users, Send, Sparkles, Bot, X, Briefcase, Eye, ChevronDown, ChevronRight, Clock, Calendar, Download, Menu } from 'lucide-react';
 import { HeroBanner } from '../components/HeroBanner';
 import { getAuthenticatedFileUrl } from '../services/api';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString();
 
 // Centered Secure PDF Modal component with dims, ~20% responsive margins, and security features
 interface SecurePdfModalProps {
@@ -19,6 +27,22 @@ interface SecurePdfModalProps {
 }
 
 const SecurePdfModal: React.FC<SecurePdfModalProps> = ({ isOpen, onClose, title, pdfUrl }) => {
+  const [numPages, setNumPages] = useState<number>();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
+    setNumPages(numPages);
+  }
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -85,15 +109,38 @@ const SecurePdfModal: React.FC<SecurePdfModalProps> = ({ isOpen, onClose, title,
 
         {/* Content Wrapper */}
         <div 
-          className="flex-1 relative bg-slate-100 dark:bg-slate-950 flex flex-col justify-stretch select-none"
+          className="flex-1 relative bg-slate-100 dark:bg-slate-950 flex flex-col justify-stretch select-none overflow-y-auto"
           onContextMenu={handleContextMenu}
         >
           {/* Cover the right click / actions */}
-          <iframe
-            src={secureUrl}
-            title={title}
-            onContextMenu={(e) => e.preventDefault()}
-          />
+          {isMobile ? (
+            <div className="flex flex-col items-center p-4 min-h-full">
+              <Document
+                file={secureUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                className="max-w-full"
+                loading={<div className="p-10 text-center text-slate-500">Loading PDF...</div>}
+                error={<div className="p-10 text-center text-red-500">Failed to load PDF.</div>}
+              >
+                {Array.from(new Array(numPages || 0), (_, index) => (
+                  <Page
+                    key={`page_${index + 1}`}
+                    pageNumber={index + 1}
+                    className="mb-4 shadow-md max-w-full"
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                    width={Math.min(window.innerWidth - 32, 800)}
+                  />
+                ))}
+              </Document>
+            </div>
+          ) : (
+            <iframe
+              src={secureUrl}
+              title={title}
+              onContextMenu={(e) => e.preventDefault()}
+            />
+          )}
         </div>
       </div>
     </div>
