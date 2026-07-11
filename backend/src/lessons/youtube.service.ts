@@ -13,7 +13,53 @@ export class YoutubeService {
 
   async validateUrl(url: string): Promise<{ isValid: boolean; reason?: string; videoId?: string }> {
     const videoId = this.extractVideoId(url);
-    return { isValid: true, videoId: videoId || 'dQw4w9WgXcQ' };
+    if (!videoId) {
+      return { isValid: false, reason: 'Invalid YouTube URL format' };
+    }
+
+    try {
+      const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+
+      if (!response.ok) {
+        return { isValid: false, reason: `HTTP error fetching watch page: ${response.status}`, videoId };
+      }
+
+      const html = await response.text();
+      const playerResponse = this.extractJson(html, 'ytInitialPlayerResponse');
+
+      if (!playerResponse) {
+        // Fallback: Check if page contains playability status or common terms
+        if (html.includes('PLAYER_ERR_OUT_OF_DATE') || html.includes('Video unavailable')) {
+          return { isValid: false, reason: 'Video unavailable (detected from static HTML text)', videoId };
+        }
+        // oEmbed fallback if ytInitialPlayerResponse parsing fails (sometimes structure changes)
+        return this.validateOEmbed(videoId);
+      }
+
+      const status = playerResponse.playabilityStatus?.status;
+      const reason = playerResponse.playabilityStatus?.reason || 'Unknown restriction';
+
+      if (status && status !== 'OK') {
+        return { isValid: false, reason: `Playability status: ${status} (${reason})`, videoId };
+      }
+
+      // Check if embeddable
+      const playableInEmbed = playerResponse.playabilityStatus?.playableInEmbed !== false;
+      if (!playableInEmbed) {
+        return { isValid: false, reason: 'Embedding is restricted by the owner', videoId };
+      }
+
+      return { isValid: true, videoId };
+    } catch (error: any) {
+      this.logger.error(`Error validating video ${videoId}: ${error.message}`);
+      // Final fallback to oEmbed if fetch fails or network issue
+      return this.validateOEmbed(videoId);
+    }
   }
 
   private async validateOEmbed(videoId: string): Promise<{ isValid: boolean; reason?: string; videoId?: string }> {
