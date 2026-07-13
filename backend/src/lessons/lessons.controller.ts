@@ -26,6 +26,12 @@ export class LessonsController {
     return this.lessonsService.getProgress(req.user.id);
   }
 
+  @Get('video-progress')
+  @Roles(Role.INTERN)
+  getVideoProgress(@Req() req: any) {
+    return this.lessonsService.getVideoProgress(req.user.id);
+  }
+
   @Post(':id/progress')
   @Roles(Role.INTERN)
   toggleProgress(
@@ -34,6 +40,15 @@ export class LessonsController {
     @Body() body: { completed: boolean },
   ) {
     return this.lessonsService.toggleProgress(id, req.user.id, body.completed);
+  }
+
+  @Post(':id/video-watched')
+  @Roles(Role.INTERN)
+  markVideoWatched(
+    @Param('id') id: string,
+    @Req() req: any,
+  ) {
+    return this.lessonsService.markVideoWatched(id, req.user.id);
   }
 
   @Get('course/:courseId')
@@ -55,7 +70,8 @@ export class LessonsController {
       body.attachmentUrl,
       body.pdfResource,
       body.duration,
-      body.weekId,
+      body.weekId || body.moduleId,
+      body.moduleId || body.weekId,
     );
   }
   @Patch(':id')

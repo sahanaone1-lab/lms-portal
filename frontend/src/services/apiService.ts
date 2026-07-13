@@ -4,7 +4,7 @@
  * No localStorage mock — all data is persisted in PostgreSQL.
  */
 import { api, API_URL, getAuthenticatedFileUrl } from './api';
-import { User, Course, Lesson, Assignment, Submission, Quiz, QuizResult, Certificate, Notification, Role, Domain, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord } from '../types';
+import { User, Course, Lesson, Module, Assignment, Submission, Quiz, QuizResult, Certificate, Notification, Role, Domain, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord, CapstoneProject, CapstoneSubmission } from '../types';
 
 
 // ---------------------------------------------------------------------------
@@ -149,6 +149,44 @@ export const courseService = {
 };
 
 // ---------------------------------------------------------------------------
+// Modules (DB-backed — source of truth for course structure)
+// ---------------------------------------------------------------------------
+export const moduleService = {
+  getByCourse: async (courseId: string): Promise<Module[]> => {
+    const res = await api.get(`/modules/course/${courseId}`);
+    return res.data;
+  },
+
+  create: async (data: {
+    courseId: string;
+    title: string;
+    description?: string;
+    order?: number;
+  }): Promise<Module> => {
+    const res = await api.post('/modules', data);
+    return res.data;
+  },
+
+  update: async (
+    id: string,
+    data: { title?: string; description?: string; order?: number },
+  ): Promise<Module> => {
+    const res = await api.patch(`/modules/${id}`, data);
+    return res.data;
+  },
+
+  delete: async (id: string): Promise<{ success: boolean }> => {
+    const res = await api.delete(`/modules/${id}`);
+    return res.data;
+  },
+
+  reorder: async (courseId: string, orderedIds: string[]): Promise<{ success: boolean }> => {
+    const res = await api.post('/modules/reorder', { courseId, orderedIds });
+    return res.data;
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Lessons
 // ---------------------------------------------------------------------------
 export const lessonService = {
@@ -177,8 +215,18 @@ export const lessonService = {
     return res.data;
   },
 
+  getVideoWatchedProgress: async (): Promise<string[]> => {
+    const res = await api.get('/lessons/video-progress');
+    return res.data;
+  },
+
   toggleProgress: async (lessonId: string, completed: boolean): Promise<any> => {
     const res = await api.post(`/lessons/${lessonId}/progress`, { completed });
+    return res.data;
+  },
+
+  markVideoWatched: async (lessonId: string): Promise<any> => {
+    const res = await api.post(`/lessons/${lessonId}/video-watched`);
     return res.data;
   },
 
@@ -521,6 +569,64 @@ export const presentationRegistrationService = {
     link.click();
     link.remove();
     window.URL.revokeObjectURL(url);
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Capstone Projects & Submissions
+// ---------------------------------------------------------------------------
+export const capstoneService = {
+  getProjectsByCourse: async (courseId: string): Promise<CapstoneProject[]> => {
+    const res = await api.get(`/capstone/projects/course/${courseId}`);
+    return res.data;
+  },
+
+  createProject: async (data: Partial<CapstoneProject>): Promise<CapstoneProject> => {
+    const res = await api.post('/capstone/projects', data);
+    return res.data;
+  },
+
+  updateProject: async (id: string, data: Partial<CapstoneProject>): Promise<CapstoneProject> => {
+    const res = await api.patch(`/capstone/projects/${id}`, data);
+    return res.data;
+  },
+
+  deleteProject: async (id: string): Promise<{ success: boolean }> => {
+    const res = await api.delete(`/capstone/projects/${id}`);
+    return res.data;
+  },
+
+  getMySubmissions: async (): Promise<CapstoneSubmission[]> => {
+    const res = await api.get('/capstone/submissions/my');
+    return res.data;
+  },
+
+  getSubmissionsByCourse: async (courseId: string): Promise<CapstoneSubmission[]> => {
+    const res = await api.get(`/capstone/submissions/course/${courseId}`);
+    return res.data;
+  },
+
+  uploadSubmission: async (
+    file: File,
+    projectId: string,
+  ): Promise<{ fileUrl: string; originalName: string; submission: CapstoneSubmission }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('projectId', projectId);
+    const res = await api.post('/capstone/submissions/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return res.data;
+  },
+
+  reviewSubmission: async (
+    id: string,
+    data: { marks: number; remarks: string; status: 'APPROVED' | 'REJECTED' },
+  ): Promise<CapstoneSubmission> => {
+    const res = await api.patch(`/capstone/submissions/${id}/review`, data);
+    return res.data;
   },
 };
 

@@ -1,5 +1,5 @@
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
 }
 
 generator client {
@@ -52,6 +52,7 @@ model User {
   certificateRequests CertificateRequest[]
   coordinatorPresentations Presentation[] @relation("CoordinatorPresentations")
   presentationRegistrations PresentationRegistration[] @relation("InternPresentationRegistrations")
+  capstoneSubmissions CapstoneSubmission[]
 
   @@map("users")
 }
@@ -68,7 +69,7 @@ model Course {
   updatedAt        DateTime       @updatedAt
 
   // Extended metadata (stored as JSON or plain strings)
-  weeks            Json?          // Array of { id, number, title } — module/week structure
+  weeks            Json?          // Legacy: Array of { id, number, title } — kept for backward compat
   status           String?        @default("Draft")  // Draft | Published | Archived
   difficulty       String?        @default("Beginner")
   duration         String?        // e.g. "120 Hours"
@@ -82,14 +83,32 @@ model Course {
   uploadedAt       DateTime?
 
   // Relations
+  modules          Module[]
   lessons          Lesson[]
   assignments      Assignment[]
   quizzes          Quiz[]
   enrollments      Enrollment[]
   certificates     Certificate[]
   certificateRequests CertificateRequest[]
+  capstoneProjects CapstoneProject[]
 
   @@map("courses")
+}
+
+// ─── Module model (proper DB table, replaces Course.weeks JSON) ──────────────
+model Module {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  order       Int      @default(0)
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lessons     Lesson[] @relation("ModuleLessons")
+
+  @@map("modules")
 }
 
 model Enrollment {
@@ -112,7 +131,9 @@ model Lesson {
   pdfResource   String?
   duration      String?
   order         Int
-  weekId        String?  // references the module/week id within the course.weeks JSON
+  weekId        String?  // Legacy: loose string ref to course.weeks JSON (kept for compat)
+  moduleId      String?  // New FK → Module table (source of truth)
+  module        Module?  @relation("ModuleLessons", fields: [moduleId], references: [id], onDelete: SetNull)
   courseId      String
   course        Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   createdAt     DateTime         @default(now())
@@ -124,7 +145,7 @@ model Assignment {
   title          String
   instruction    String
   attachmentUrl  String?
-  dueDate        DateTime
+  dueDate        DateTime?
   maxMarks       Int?         @default(100)
   submissionType String?      @default("File Upload")
   submissionRules String?
@@ -346,4 +367,39 @@ model ContactMessage {
   createdAt DateTime @default(now())
 
   @@map("contact_messages")
+}
+
+model CapstoneProject {
+  id               String               @id @default(uuid())
+  title            String
+  problemStatement String
+  objectives       String               // Objectives details
+  requiredTech     String               // Required technologies list
+  deliverables     String               // Deliverables expected
+  instructions     String               // Submission instructions
+  courseId         String
+  course           Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  submissions      CapstoneSubmission[]
+
+  @@map("capstone_projects")
+}
+
+model CapstoneSubmission {
+  id          String    @id @default(uuid())
+  studentId   String
+  student     User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  projectId   String
+  project     CapstoneProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fileUrl     String
+  fileName    String
+  marks       Int?
+  remarks     String?
+  status      String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  submittedAt DateTime  @default(now())
+  reviewedAt  DateTime?
+
+  @@unique([studentId, projectId])
+  @@map("capstone_submissions")
 }

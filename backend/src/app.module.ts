@@ -16,6 +16,8 @@ import { ProjectsModule } from './projects/projects.module';
 import { PresentationsModule } from './presentations/presentations.module';
 import { PresentationRegistrationsModule } from './presentation-registrations/presentation-registrations.module';
 import { AwsModule } from './aws/aws.module';
+import { ModulesModule } from './modules/modules.module';
+import { CapstoneModule } from './capstone/capstone.module';
 
 @Module({
   imports: [
@@ -34,9 +36,12 @@ import { AwsModule } from './aws/aws.module';
     PresentationsModule,
     PresentationRegistrationsModule,
     AwsModule,
+    ModulesModule,
+    CapstoneModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
+
 

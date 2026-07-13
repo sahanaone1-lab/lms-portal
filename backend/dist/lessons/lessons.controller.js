@@ -26,14 +26,20 @@ let LessonsController = class LessonsController {
     getProgress(req) {
         return this.lessonsService.getProgress(req.user.id);
     }
+    getVideoProgress(req) {
+        return this.lessonsService.getVideoProgress(req.user.id);
+    }
     toggleProgress(id, req, body) {
         return this.lessonsService.toggleProgress(id, req.user.id, body.completed);
+    }
+    markVideoWatched(id, req) {
+        return this.lessonsService.markVideoWatched(id, req.user.id);
     }
     getByCourse(courseId) {
         return this.lessonsService.getByCourse(courseId);
     }
     create(req, body) {
-        return this.lessonsService.create(body.courseId, body.title, body.content, body.videoUrl, body.order, req.user.id, req.user.role, body.attachmentUrl, body.pdfResource, body.duration, body.weekId);
+        return this.lessonsService.create(body.courseId, body.title, body.content, body.videoUrl, body.order, req.user.id, req.user.role, body.attachmentUrl, body.pdfResource, body.duration, body.weekId || body.moduleId, body.moduleId || body.weekId);
     }
     update(id, req, body) {
         return this.lessonsService.update(id, body, req.user.id, req.user.role);
@@ -55,6 +61,14 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], LessonsController.prototype, "getProgress", null);
 __decorate([
+    (0, common_1.Get)('video-progress'),
+    (0, roles_decorator_1.Roles)(client_1.Role.INTERN),
+    __param(0, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], LessonsController.prototype, "getVideoProgress", null);
+__decorate([
     (0, common_1.Post)(':id/progress'),
     (0, roles_decorator_1.Roles)(client_1.Role.INTERN),
     __param(0, (0, common_1.Param)('id')),
@@ -64,6 +78,15 @@ __decorate([
     __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", void 0)
 ], LessonsController.prototype, "toggleProgress", null);
+__decorate([
+    (0, common_1.Post)(':id/video-watched'),
+    (0, roles_decorator_1.Roles)(client_1.Role.INTERN),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], LessonsController.prototype, "markVideoWatched", null);
 __decorate([
     (0, common_1.Get)('course/:courseId'),
     __param(0, (0, common_1.Param)('courseId')),

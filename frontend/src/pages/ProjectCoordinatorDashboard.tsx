@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from '../components/Toast';
 import { Button, Input, Select, Textarea, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Modal, Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui';
-import { courseService, lessonService, assignmentService, quizService, submissionService, userService, certificateService, domainService, projectService, presentationService, presentationRegistrationService } from '../services/apiService';
-import { Course, Lesson, Assignment, Quiz, Submission, Question, User, Certificate, Domain, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord } from '../types';
+import { courseService, lessonService, assignmentService, quizService, submissionService, userService, certificateService, domainService, projectService, presentationService, presentationRegistrationService, moduleService, capstoneService } from '../services/apiService';
+import { Course, Lesson, Module, Assignment, Quiz, Submission, Question, User, Certificate, Domain, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord, CapstoneProject, CapstoneSubmission } from '../types';
 import { BookOpen, Plus, FileText, CheckCircle, Video, ListTodo, Award, Check, Users, FileCheck, ArrowLeft, Grid, Layers, Database, Brain, Shield, Globe, Search, Calendar, ChevronLeft, ChevronRight, Clock, Eye, Trash, Edit, Play, Briefcase, Upload, Download, X } from 'lucide-react';
 
 import { useAuth } from '../store/AuthContext';
@@ -70,9 +70,11 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
   const [courseDuration, setCourseDuration] = useState('');
   const [courseOutcomes, setCourseOutcomes] = useState('');
 
-  // Weeks state
+  // Modules (DB-backed) state — replaces course.weeks JSON
+  const [courseModules, setCourseModules] = useState<Module[]>([]);
   const [expandedWeeks, setExpandedWeeks] = useState<Record<string, boolean>>({});
   const [weekTitle, setWeekTitle] = useState('');
+  const [weekDescription, setWeekDescription] = useState('');
   const [editingWeekId, setEditingWeekId] = useState<string | null>(null);
   const [activeWeekId, setActiveWeekId] = useState<string | null>(null);
 
@@ -135,7 +137,25 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
   const [selectedReportProgress, setSelectedReportProgress] = useState<any>(null);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [internsMonitoring, setInternsMonitoring] = useState<any[]>([]);
-  const [activeGradesTab, setActiveGradesTab] = useState<'progress' | 'submissions'>('progress');
+  const [activeGradesTab, setActiveGradesTab] = useState<'progress' | 'submissions' | 'capstone'>('progress');
+  const [capstoneSubmissions, setCapstoneSubmissions] = useState<CapstoneSubmission[]>([]);
+  const [capstoneProjects, setCapstoneProjects] = useState<CapstoneProject[]>([]);
+  const [isCapstoneModalOpen, setIsCapstoneModalOpen] = useState(false);
+  const [editingCapstoneProject, setEditingCapstoneProject] = useState<CapstoneProject | null>(null);
+
+  // Capstone Project Form
+  const [capstoneTitle, setCapstoneTitle] = useState('');
+  const [capstoneProblem, setCapstoneProblem] = useState('');
+  const [capstoneObjectives, setCapstoneObjectives] = useState('');
+  const [capstoneTech, setCapstoneTech] = useState('');
+  const [capstoneDeliverables, setCapstoneDeliverables] = useState('');
+  const [capstoneInstructions, setCapstoneInstructions] = useState('');
+
+  // Capstone Submission Review
+  const [selectedCapstoneSub, setSelectedCapstoneSub] = useState<CapstoneSubmission | null>(null);
+  const [isCapstoneReviewModalOpen, setIsCapstoneReviewModalOpen] = useState(false);
+  const [capstoneMarks, setCapstoneMarks] = useState('');
+  const [capstoneRemarks, setCapstoneRemarks] = useState('');
   const [activeDetailDomain, setActiveDetailDomain] = useState<string | null>(null);
   const [projectSearchTerm, setProjectSearchTerm] = useState('');
   const [projectStatusFilter, setProjectStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
@@ -169,6 +189,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
         : allCourses;
 
       const myGrading = await submissionService.getProjectCoordinatorSubmissions();
+      const capstoneSubs = await capstoneService.getCoordinatorSubmissions().catch(() => []);
       const usersData = await userService.getAll().catch(() => []);
       const myCertRequests = await certificateService.getProjectCoordinatorRequests().catch(() => []);
       const monitoringData = await userService.getInternsMonitoring(true).catch(() => []);
@@ -177,6 +198,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
 
       setCourses(domainCourses);
       setSubmissions(myGrading);
+      setCapstoneSubmissions(capstoneSubs);
       setAllUsers(usersData);
       setAllCoursesList(allCourses);
       setCertRequests(myCertRequests);
@@ -223,29 +245,43 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     }
   }, [location.search, courses, submissions]);
 
+  // Get modules for a course — from courseModules state (loaded via moduleService)
   const getCourseWeeks = (course: Course) => {
+    // Use DB-loaded modules if available, else fall back to course.weeks JSON
+    if (courseModules.length > 0 && courseModules[0].courseId === course.id) {
+      return courseModules.map((m) => ({ id: m.id, number: m.order, title: m.title }));
+    }
+    if (course.modules && course.modules.length > 0) {
+      return course.modules.map((m) => ({ id: m.id, number: m.order, title: m.title }));
+    }
     if (course.weeks && course.weeks.length > 0) {
-      return course.weeks;
+      return course.weeks.map((w: any) => ({ id: w.id, number: w.number, title: w.title }));
     }
     return [{ id: 'w_default', number: 1, title: 'Introduction' }];
   };
 
   const getWeekItems = (weekId: string, course: Course) => {
-    const weeks = getCourseWeeks(course);
-    const isFirstWeek = weeks[0]?.id === weekId;
+    // Use DB-loaded modules if available
+    const activeMods = courseModules.length > 0 && courseModules[0].courseId === course.id
+      ? courseModules
+      : (course.modules || []);
 
-    const lessons = (course.lessons || []).filter(l =>
-      l.weekId === weekId || (isFirstWeek && !l.weekId)
+    const mod = activeMods.find((m) => m.id === weekId);
+    const isFirstWeek = activeMods.length > 0 && activeMods[0].id === weekId;
+
+    // Prefer lessons from module object (nested), fallback to course.lessons
+    const moduleLessons = mod?.lessons || [];
+    const flatLessons = (course.lessons || []).filter(
+      (l) => l.moduleId === weekId || l.weekId === weekId || (isFirstWeek && !l.moduleId && !l.weekId),
     ).sort((a, b) => a.order - b.order);
+    const lessons = moduleLessons.length > 0 ? moduleLessons.sort((a, b) => a.order - b.order) : flatLessons;
 
-    const assignments = (course.assignments || []).filter(a =>
-      a.weekId === weekId || (isFirstWeek && !a.weekId)
+    const assignments = (course.assignments || []).filter(
+      (a) => a.weekId === weekId || (isFirstWeek && !a.weekId),
     );
-
-    const quizzes = (course.quizzes || []).filter(q =>
-      q.weekId === weekId || (isFirstWeek && !q.weekId)
+    const quizzes = (course.quizzes || []).filter(
+      (q) => q.weekId === weekId || (isFirstWeek && !q.weekId),
     );
-
     return { lessons, assignments, quizzes };
   };
 
@@ -284,10 +320,16 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
   const handleSelectCourse = async (course: Course) => {
     try {
       const detailed = await courseService.getById(course.id);
+      // Load modules from Supabase via moduleService
+      const mods = await moduleService.getByCourse(course.id);
+      const capProjs = await capstoneService.getProjectsByCourse(course.id).catch(() => []);
+      setCourseModules(mods);
+      setCapstoneProjects(capProjs);
       setSelectedCourse(detailed);
-      const weeks = getCourseWeeks(detailed);
-      if (weeks.length > 0) {
-        setExpandedWeeks(prev => ({ ...prev, [weeks[0].id]: true }));
+      if (mods.length > 0) {
+        setExpandedWeeks((prev) => ({ ...prev, [mods[0].id]: true }));
+      } else if (detailed.modules && detailed.modules.length > 0) {
+        setExpandedWeeks((prev) => ({ ...prev, [detailed.modules![0].id]: true }));
       }
     } catch (err) {
       console.error(err);
@@ -477,29 +519,37 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     e.preventDefault();
     if (!selectedCourse || !weekTitle) return;
     try {
-      const currentWeeks = getCourseWeeks(selectedCourse);
       if (editingWeekId) {
-        const updatedWeeks = currentWeeks.map(w =>
-          w.id === editingWeekId ? { ...w, title: weekTitle } : w
-        );
-        await courseService.update(selectedCourse.id, { weeks: updatedWeeks });
+        // Update existing module via moduleService
+        await moduleService.update(editingWeekId, {
+          title: weekTitle,
+          description: weekDescription || undefined,
+        });
+        toast.success('Module updated successfully!');
       } else {
-        const newWeek = {
-          id: 'w_' + Math.random().toString(36).substring(7),
-          number: currentWeeks.length + 1,
-          title: weekTitle
-        };
-        await courseService.update(selectedCourse.id, { weeks: [...currentWeeks, newWeek] });
+        // Create new module via moduleService
+        await moduleService.create({
+          courseId: selectedCourse.id,
+          title: weekTitle,
+          description: weekDescription || undefined,
+        });
+        toast.success('Module created successfully!');
       }
       setIsWeekModalOpen(false);
       setWeekTitle('');
+      setWeekDescription('');
       setEditingWeekId(null);
 
-      const detailed = await courseService.getById(selectedCourse.id);
+      // Reload modules and course from DB
+      const [mods, detailed] = await Promise.all([
+        moduleService.getByCourse(selectedCourse.id),
+        courseService.getById(selectedCourse.id),
+      ]);
+      setCourseModules(mods);
       setSelectedCourse(detailed);
     } catch (err: any) {
       console.error(err);
-      alert('Failed to save module: ' + (err.response?.data?.message || err.message));
+      toast.error('Failed to save module: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -508,37 +558,19 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     setDeleteConfirm({
       show: true,
       title: 'Delete Module',
-      message: 'Are you sure you want to delete this module? Lessons, quizzes, and assignments in this module will be reassigned to Module 1.',
+      message: 'Are you sure you want to delete this module? Lessons in this module will be reassigned to another module.',
       onConfirm: async () => {
         try {
-          const currentWeeks = getCourseWeeks(selectedCourse);
-          const filteredWeeks = currentWeeks.filter(w => w.id !== weekId);
-          const updatedWeeks = filteredWeeks.map((w, idx) => ({ ...w, number: idx + 1 }));
-
-          await courseService.update(selectedCourse.id, { weeks: updatedWeeks });
-
-          const firstWeekId = updatedWeeks[0]?.id || 'w_default';
-          const lessons = selectedCourse.lessons || [];
-          for (const l of lessons) {
-            if (l.weekId === weekId) {
-              await lessonService.update(l.id, { weekId: firstWeekId });
-            }
-          }
-          const assignments = selectedCourse.assignments || [];
-          for (const a of assignments) {
-            if (a.weekId === weekId) {
-              await assignmentService.update(a.id, { weekId: firstWeekId });
-            }
-          }
-          const quizzes = selectedCourse.quizzes || [];
-          for (const q of quizzes) {
-            if (q.weekId === weekId) {
-              await quizService.update(q.id, { weekId: firstWeekId });
-            }
-          }
-
+          // Delete via moduleService — service handles lesson reassignment
+          await moduleService.delete(weekId);
+          // Reload modules and course
+          const [mods, detailed] = await Promise.all([
+            moduleService.getByCourse(selectedCourse.id),
+            courseService.getById(selectedCourse.id),
+          ]);
+          setCourseModules(mods);
+          setSelectedCourse(detailed);
           toast.success('Module successfully deleted');
-          handleSelectCourse(selectedCourse);
         } catch (err: any) {
           toast.error('Failed to delete module');
         }
@@ -557,21 +589,24 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           videoUrl: lessonVideo,
           pdfResource: lessonPdf,
           duration: lessonDuration,
-          order: parseInt(lessonOrder) || 1
+          order: parseInt(lessonOrder) || 1,
+          moduleId: activeWeekId || editingLesson.moduleId || editingLesson.weekId || undefined,
+          weekId: activeWeekId || editingLesson.moduleId || editingLesson.weekId || undefined,
         });
-        alert('Lesson updated successfully!');
+        toast.success('Lesson updated successfully!');
       } else {
         await lessonService.create({
           courseId: selectedCourse.id,
+          moduleId: activeWeekId || undefined,
           weekId: activeWeekId || undefined,
           title: lessonTitle,
           content: lessonContent,
           videoUrl: lessonVideo,
           pdfResource: lessonPdf,
           duration: lessonDuration,
-          order: parseInt(lessonOrder) || 1
+          order: parseInt(lessonOrder) || 1,
         });
-        alert('Lesson added successfully!');
+        toast.success('Lesson added successfully!');
       }
 
       setIsLessonModalOpen(false);
@@ -584,9 +619,15 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       setEditingLesson(null);
       setActiveWeekId(null);
 
-      handleSelectCourse(selectedCourse);
-    } catch (err) {
-      alert('Failed to save lesson');
+      // Reload modules and course from DB
+      const [mods, detailed] = await Promise.all([
+        moduleService.getByCourse(selectedCourse.id),
+        courseService.getById(selectedCourse.id),
+      ]);
+      setCourseModules(mods);
+      setSelectedCourse(detailed);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save lesson');
     }
   };
 
@@ -788,6 +829,105 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
         }
       },
     });
+  };
+
+  const handleSaveCapstoneProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCourse || !capstoneTitle) return;
+    try {
+      if (editingCapstoneProject) {
+        await capstoneService.updateProject(editingCapstoneProject.id, {
+          title: capstoneTitle,
+          problemStatement: capstoneProblem,
+          objectives: capstoneObjectives,
+          requiredTech: capstoneTech,
+          deliverables: capstoneDeliverables,
+          instructions: capstoneInstructions,
+        });
+        alert('Capstone project updated successfully!');
+      } else {
+        await capstoneService.createProject({
+          courseId: selectedCourse.id,
+          title: capstoneTitle,
+          problemStatement: capstoneProblem,
+          objectives: capstoneObjectives,
+          requiredTech: capstoneTech,
+          deliverables: capstoneDeliverables,
+          instructions: capstoneInstructions,
+        });
+        alert('Capstone project created successfully!');
+      }
+      setIsCapstoneModalOpen(false);
+      setCapstoneTitle('');
+      setCapstoneProblem('');
+      setCapstoneObjectives('');
+      setCapstoneTech('');
+      setCapstoneDeliverables('');
+      setCapstoneInstructions('');
+      setEditingCapstoneProject(null);
+
+      const updatedProjs = await capstoneService.getProjectsByCourse(selectedCourse.id);
+      setCapstoneProjects(updatedProjs);
+    } catch (err) {
+      alert('Failed to save Capstone project');
+    }
+  };
+
+  const handleEditCapstoneProject = (proj: CapstoneProject) => {
+    setEditingCapstoneProject(proj);
+    setCapstoneTitle(proj.title);
+    setCapstoneProblem(proj.problemStatement);
+    setCapstoneObjectives(proj.objectives);
+    setCapstoneTech(proj.requiredTech);
+    setCapstoneDeliverables(proj.deliverables);
+    setCapstoneInstructions(proj.instructions);
+    setIsCapstoneModalOpen(true);
+  };
+
+  const handleDeleteCapstoneProject = (id: string) => {
+    if (!selectedCourse) return;
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Capstone Project',
+      message: 'Are you sure you want to delete this Capstone project?',
+      onConfirm: async () => {
+        try {
+          await capstoneService.deleteProject(id);
+          toast.success('Capstone project deleted successfully');
+          const updatedProjs = await capstoneService.getProjectsByCourse(selectedCourse.id);
+          setCapstoneProjects(updatedProjs);
+        } catch (err) {
+          toast.error('Failed to delete Capstone project');
+        }
+      },
+    });
+  };
+
+  const handleReviewCapstoneSubmission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCapstoneSub) return;
+    const parsedMarks = parseInt(capstoneMarks);
+    if (isNaN(parsedMarks) || parsedMarks < 0 || parsedMarks > 100) {
+      alert('Marks must be between 0 and 100');
+      return;
+    }
+    try {
+      await capstoneService.reviewSubmission(selectedCapstoneSub.id, {
+        marks: parsedMarks,
+        remarks: capstoneRemarks,
+        status: isApproved ? 'APPROVED' : 'REJECTED',
+      });
+      setIsCapstoneReviewModalOpen(false);
+      setCapstoneMarks('');
+      setCapstoneRemarks('');
+      setSelectedCapstoneSub(null);
+      toast.success(isApproved ? 'Capstone Project approved!' : 'Review submitted successfully.');
+
+      const updatedSubs = await capstoneService.getCoordinatorSubmissions().catch(() => []);
+      setCapstoneSubmissions(updatedSubs);
+    } catch (err: any) {
+      toast.error('Failed to submit Capstone review');
+    }
   };
 
   const handlePreviewQuiz = (qz: Quiz) => {
@@ -1700,7 +1840,13 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
 
                                 {/* Header Actions */}
                                 <div className="flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                  <Button variant="ghost" size="sm" onClick={() => { setEditingWeekId(week.id); setWeekTitle(week.title); setIsWeekModalOpen(true); }} className="h-7 text-[10px] px-2" title="Edit Week Title">
+                                  <Button variant="ghost" size="sm" onClick={() => {
+                                    const mod = courseModules.find(m => m.id === week.id);
+                                    setEditingWeekId(week.id);
+                                    setWeekTitle(week.title);
+                                    setWeekDescription(mod?.description || '');
+                                    setIsWeekModalOpen(true);
+                                  }} className="h-7 text-[10px] px-2" title="Edit Week Title">
                                     Edit Title
                                   </Button>
                                   <Button variant="outline" size="sm" onClick={() => { setActiveWeekId(week.id); setEditingLesson(null); setLessonTitle(''); setLessonContent(''); setLessonVideo(''); setLessonPdf(''); setLessonDuration(''); setLessonOrder((lessons.length + 1).toString()); setIsLessonModalOpen(true); }} className="h-7 text-[10px] px-2">
@@ -1712,6 +1858,20 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                                   <Button variant="outline" size="sm" onClick={() => { setActiveWeekId(week.id); setEditingAssignment(null); setAssignmentTitle(''); setAssignmentInstructions(''); setAssignmentAttachment(''); setAssignmentDue(''); setAssignmentMaxMarks('100'); setAssignmentSubtype('File Upload'); setAssignmentRules(''); setIsAssignmentModalOpen(true); }} className="h-7 text-[10px] px-2">
                                     + Task
                                   </Button>
+                                  {week.title.toLowerCase().includes('capstone') && (
+                                    <Button variant="outline" size="sm" onClick={() => {
+                                      setEditingCapstoneProject(null);
+                                      setCapstoneTitle('');
+                                      setCapstoneProblem('');
+                                      setCapstoneObjectives('');
+                                      setCapstoneTech('');
+                                      setCapstoneDeliverables('');
+                                      setCapstoneInstructions('');
+                                      setIsCapstoneModalOpen(true);
+                                    }} className="h-7 text-[10px] px-2 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/25">
+                                      + Capstone
+                                    </Button>
+                                  )}
                                   <Button variant="ghost" size="sm" onClick={() => handleDeleteWeek(week.id)} className="h-7 text-[10px] px-2 text-destructive hover:bg-destructive/10">
                                     Delete Module
                                   </Button>
@@ -1721,7 +1881,45 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                               {/* Accordion Content Panel */}
                               {isExpanded && (
                                 <div className="p-4 bg-background space-y-4 animate-fade-in border-t border-border/40">
-                                  {lessons.length === 0 && quizzes.length === 0 && assignments.length === 0 ? (
+                                  {week.title.toLowerCase().includes('capstone') ? (
+                                    <div className="space-y-4 text-left">
+                                      <div className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider mb-1 flex items-center gap-1.5"><Award className="h-3.5 w-3.5 text-amber-500" /> Capstone Project Options (Course Level)</div>
+                                      {capstoneProjects.length === 0 ? (
+                                        <div className="py-8 text-center text-xs text-muted-foreground border border-dashed border-amber-500/30 rounded-lg bg-amber-500/[0.01]">
+                                          No Capstone projects created yet. Click "+ Capstone" above to define the 5 projects.
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-2">
+                                          {capstoneProjects.map((proj, pIdx) => (
+                                            <div key={proj.id} className="p-3 border border-border rounded-lg bg-secondary/5 flex items-center justify-between hover:bg-secondary/10 transition-all">
+                                              <div className="flex items-start space-x-3 text-left">
+                                                <div className="mt-0.5 p-1 bg-amber-500/10 text-amber-500 rounded">
+                                                  <Award className="h-3.5 w-3.5" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                  <p className="text-xs font-bold text-foreground truncate">{proj.title}</p>
+                                                  <p className="text-[10px] text-muted-foreground truncate max-w-sm mt-0.5">{proj.problemStatement}</p>
+                                                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                                                    <span className="text-[8px] font-bold uppercase bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded">
+                                                      Tech: {proj.requiredTech}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <div className="flex items-center gap-1 shrink-0 ml-4">
+                                                <Button variant="ghost" size="sm" onClick={() => handleEditCapstoneProject(proj)} className="h-7 text-[10px] px-2 text-[#0F4C81]">
+                                                  <Edit className="h-3 w-3 mr-1" /> Edit
+                                                </Button>
+                                                <Button variant="ghost" size="sm" onClick={() => handleDeleteCapstoneProject(proj.id)} className="h-7 text-[10px] px-2 text-destructive">
+                                                  <Trash className="h-3 w-3 mr-1" /> Delete
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : lessons.length === 0 && quizzes.length === 0 && assignments.length === 0 ? (
                                     <div className="py-8 text-center text-xs text-muted-foreground border border-dashed rounded-lg">
                                       No items added to this module yet. Use the action buttons above to construct module content.
                                     </div>
@@ -2142,6 +2340,16 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           >
             Project Submissions Review
           </button>
+          <button
+            onClick={() => setActiveGradesTab('capstone')}
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px cursor-pointer ${
+              activeGradesTab === 'capstone'
+                ? 'border-[#0F4C81] text-[#0F4C81]'
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            Capstone Submissions Review
+          </button>
         </div>
 
         {activeGradesTab === 'progress' ? (
@@ -2246,7 +2454,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        ) : (
+        ) : activeGradesTab === 'submissions' ? (
           <Card className="rounded-premium shadow-premium border border-slate-100 bg-white overflow-hidden">
             <CardHeader className="pb-3 border-b border-slate-100/80 bg-slate-50/20">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -2391,6 +2599,127 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                   </table></div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="rounded-premium shadow-premium border border-slate-100 bg-white overflow-hidden text-left">
+            <CardHeader className="pb-3 border-b border-slate-100/80 bg-slate-50/20">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <CardTitle className="text-sm font-bold font-display text-slate-800">
+                    Capstone Project Submissions ({capstoneSubmissions.length})
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-400 mt-0.5">
+                    Evaluate course final capstone projects, grade submissions, and give revision remarks.
+                  </CardDescription>
+                </div>
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Search by intern name, email or project..."
+                    value={projectSearchTerm}
+                    onChange={(e) => setProjectSearchTerm(e.target.value)}
+                    className="pl-9 h-9 text-xs"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {(() => {
+                const filtered = capstoneSubmissions.filter((sub) => {
+                  const studentMatch =
+                    (sub.studentName || '').toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
+                    (sub.studentEmail || '').toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
+                    (sub.project?.title || '').toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
+                    (sub.project?.course?.title || '').toLowerCase().includes(projectSearchTerm.toLowerCase());
+                  return studentMatch;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="py-16 text-center text-xs text-muted-foreground border border-dashed rounded-lg m-6">
+                      No Capstone submissions found matching your search.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto w-full">
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                          <th className="p-4">Intern Name</th>
+                          <th className="p-4">Employee ID</th>
+                          <th className="p-4">Domain</th>
+                          <th className="p-4">Capstone Project / Course</th>
+                          <th className="p-4">Submission Date</th>
+                          <th className="p-4 text-center">Status</th>
+                          <th className="p-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                        {filtered.map((sub) => {
+                          const statusColor =
+                            sub.status === 'APPROVED' ? 'success' :
+                            sub.status === 'REJECTED' ? 'destructive' : 'outline';
+                          return (
+                            <tr key={sub.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="p-4">
+                                <div className="font-bold text-slate-900">{sub.studentName}</div>
+                                <div className="text-[10px] text-muted-foreground mt-0.5">{sub.studentEmail}</div>
+                              </td>
+                              <td className="p-4 tabular-nums">{sub.studentEmployeeId || 'N/A'}</td>
+                              <td className="p-4 uppercase tracking-wider text-[9px] font-bold text-slate-400">{sub.studentDomain || 'N/A'}</td>
+                              <td className="p-4">
+                                <div className="font-bold text-slate-800">{sub.project?.title}</div>
+                                <div className="text-[10px] text-muted-foreground mt-0.5">{sub.project?.course?.title}</div>
+                              </td>
+                              <td className="p-4 text-slate-500">
+                                {new Date(sub.submittedAt).toLocaleDateString(undefined, {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </td>
+                              <td className="p-4 text-center font-bold">
+                                <Badge variant={statusColor} className="font-bold text-[9px] uppercase tracking-wide px-2 py-0.5">
+                                  {sub.status}
+                                </Badge>
+                              </td>
+                              <td className="p-4 text-right space-x-2 whitespace-nowrap">
+                                <a
+                                  href={getAuthenticatedFileUrl(sub.fileUrl)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center justify-center rounded-lg text-[10px] font-bold h-7 px-3 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all shadow-xs cursor-pointer"
+                                >
+                                  Download PDF/DOC
+                                </a>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-[10px] h-7 px-3 border-slate-200 hover:border-primary hover:bg-primary hover:text-white rounded-lg transition-all shadow-xs font-bold"
+                                  onClick={() => {
+                                    setSelectedCapstoneSub(sub);
+                                    setCapstoneMarks(sub.marks?.toString() || '');
+                                    setCapstoneRemarks(sub.remarks || '');
+                                    setIsApproved(sub.status !== 'REJECTED');
+                                    setIsCapstoneReviewModalOpen(true);
+                                  }}
+                                >
+                                  Evaluate
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         )}
@@ -3643,11 +3972,12 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       </Modal>
 
       {/* Modal: Add/Edit Module */}
-      <Modal isOpen={isWeekModalOpen} onClose={() => { setIsWeekModalOpen(false); setWeekTitle(''); setEditingWeekId(null); }} title={editingWeekId ? "Edit Module Title" : "Create New Module"}>
+      <Modal isOpen={isWeekModalOpen} onClose={() => { setIsWeekModalOpen(false); setWeekTitle(''); setWeekDescription(''); setEditingWeekId(null); }} title={editingWeekId ? "Edit Module" : "Create New Module"}>
         <form onSubmit={handleSaveWeek} className="space-y-4">
-          <Input label="Module Title" placeholder="e.g. Introduction to AI / Core Concepts" value={weekTitle} onChange={(e) => setWeekTitle(e.target.value)} />
+          <Input label="Module Title" placeholder="e.g. Introduction to React / Advanced Concepts" value={weekTitle} onChange={(e) => setWeekTitle(e.target.value)} />
+          <Textarea label="Description (optional)" placeholder="Brief description of what this module covers..." value={weekDescription} onChange={(e) => setWeekDescription(e.target.value)} rows={2} />
           <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="ghost" type="button" onClick={() => { setIsWeekModalOpen(false); setWeekTitle(''); setEditingWeekId(null); }}>Cancel</Button>
+            <Button variant="ghost" type="button" onClick={() => { setIsWeekModalOpen(false); setWeekTitle(''); setWeekDescription(''); setEditingWeekId(null); }}>Cancel</Button>
             <Button type="submit">{editingWeekId ? "Save Changes" : "Add Module"}</Button>
           </div>
         </form>
@@ -4044,6 +4374,178 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {/* Modal: Create/Edit Capstone Project */}
+      <Modal
+        isOpen={isCapstoneModalOpen}
+        onClose={() => setIsCapstoneModalOpen(false)}
+        title={editingCapstoneProject ? "Edit Capstone Project" : "Add Course Capstone Project"}
+        sizeClassName="max-w-3xl w-full"
+      >
+        <form onSubmit={handleSaveCapstoneProject} className="p-6 space-y-4 text-left">
+          <Input
+            label="Project Title"
+            placeholder="e.g. Real-time Distributed Analytics Pipeline"
+            value={capstoneTitle}
+            onChange={(e) => setCapstoneTitle(e.target.value)}
+            required
+          />
+          <Textarea
+            label="Problem Statement"
+            placeholder="Provide details about the real-world business problem interns will solve..."
+            value={capstoneProblem}
+            onChange={(e) => setCapstoneProblem(e.target.value)}
+            required
+            rows={3}
+          />
+          <Textarea
+            label="Project Objectives"
+            placeholder="List core objectives / requirements (one per line)..."
+            value={capstoneObjectives}
+            onChange={(e) => setCapstoneObjectives(e.target.value)}
+            required
+            rows={3}
+          />
+          <Input
+            label="Required Technologies"
+            placeholder="e.g. NestJS, PostgreSQL, React, AWS S3, Redis"
+            value={capstoneTech}
+            onChange={(e) => setCapstoneTech(e.target.value)}
+            required
+          />
+          <Textarea
+            label="Expected Deliverables"
+            placeholder="List final submission deliverables..."
+            value={capstoneDeliverables}
+            onChange={(e) => setCapstoneDeliverables(e.target.value)}
+            required
+            rows={3}
+          />
+          <Textarea
+            label="Submission Instructions"
+            placeholder="Provide code compilation, PDF summary report upload instructions..."
+            value={capstoneInstructions}
+            onChange={(e) => setCapstoneInstructions(e.target.value)}
+            required
+            rows={3}
+          />
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+            <Button type="button" variant="outline" onClick={() => setIsCapstoneModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">
+              {editingCapstoneProject ? 'Update Project' : 'Save Project'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Evaluate Capstone Submission */}
+      <Modal
+        isOpen={isCapstoneReviewModalOpen}
+        onClose={() => setIsCapstoneReviewModalOpen(false)}
+        title="Evaluate Capstone Project Submission"
+        sizeClassName="max-w-2xl w-full"
+      >
+        {selectedCapstoneSub && (
+          <form onSubmit={handleReviewCapstoneSubmission} className="p-6 space-y-5 text-left">
+            <div className="bg-[#0F4C81]/[0.02] border border-[#0F4C81]/15 p-4 rounded-xl space-y-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Intern Submission Details</h4>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mt-1">{selectedCapstoneSub.studentName}</p>
+                  <p className="text-[10px] text-muted-foreground">{selectedCapstoneSub.studentEmail} • Emp ID: {selectedCapstoneSub.studentEmployeeId || 'N/A'}</p>
+                </div>
+                <Badge variant="outline" className="text-[9px] uppercase font-bold tracking-wider text-amber-500 border-amber-500/20 bg-amber-500/[0.01]">
+                  Capstone Grader
+                </Badge>
+              </div>
+              <div className="border-t border-[#0F4C81]/10 pt-2.5 mt-2">
+                <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wide">Project Target</span>
+                <p className="text-xs font-bold text-slate-800 mt-0.5">{selectedCapstoneSub.project?.title}</p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 text-left">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Submitted Artifact File</label>
+              <div className="flex items-center justify-between p-3 bg-secondary/15 rounded-xl border border-border/40">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-rose-50 text-rose-500 rounded"><FileText className="h-4 w-4" /></div>
+                  <span className="text-xs font-bold text-foreground max-w-[280px] truncate">{selectedCapstoneSub.fileName}</span>
+                </div>
+                <a
+                  href={getAuthenticatedFileUrl(selectedCapstoneSub.fileUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center rounded-lg text-[10px] font-bold h-7 px-3 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all cursor-pointer shadow-xs"
+                >
+                  Download PDF/DOC
+                </a>
+              </div>
+            </div>
+
+            <Input
+              label="Assign Project Marks (0 - 100)"
+              type="number"
+              min="0"
+              max="100"
+              value={capstoneMarks}
+              onChange={(e) => setCapstoneMarks(e.target.value)}
+              required
+            />
+
+            <Textarea
+              label="Written Remarks & Assessment Feedback"
+              placeholder="Provide constructive review remarks, details on technology usage, code standard comments..."
+              value={capstoneRemarks}
+              onChange={(e) => setCapstoneRemarks(e.target.value)}
+              required
+              rows={4}
+            />
+
+            <div className="space-y-1.5 text-left">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Grading Action</label>
+              <div className="flex items-center space-x-6 py-3 bg-slate-50 px-4 rounded-xl border border-slate-100">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="capstoneApproved"
+                    name="capstoneStatus"
+                    checked={isApproved === true}
+                    onChange={() => setIsApproved(true)}
+                    className="h-4 w-4 text-[#0F4C81] border-slate-300 focus:ring-[#0F4C81]"
+                  />
+                  <label htmlFor="capstoneApproved" className="text-xs font-bold text-emerald-600 uppercase select-none cursor-pointer">
+                    Approve Capstone Project ✅
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="capstoneRejected"
+                    name="capstoneStatus"
+                    checked={isApproved === false}
+                    onChange={() => setIsApproved(false)}
+                    className="h-4 w-4 text-destructive border-slate-300 focus:ring-destructive"
+                  />
+                  <label htmlFor="capstoneRejected" className="text-xs font-bold text-destructive uppercase select-none cursor-pointer">
+                    Reject / Needs Work ❌
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+              <Button type="button" variant="outline" onClick={() => setIsCapstoneReviewModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                Submit Evaluation
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };

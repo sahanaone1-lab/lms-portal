@@ -4,8 +4,8 @@ import { useAuth } from '../store/AuthContext';
 import { useToast } from '../components/Toast';
 import { Button, Input, Textarea, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Modal, Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui';
 import { VideoPlayer } from '../components/VideoPlayer';
-import { courseService, lessonService, assignmentService, submissionService, quizService, certificateService, projectService, authService, presentationService, presentationRegistrationService } from '../services/apiService';
-import { Course, Lesson, Assignment, Submission, Quiz, QuizResult, Certificate, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord } from '../types';
+import { courseService, lessonService, assignmentService, submissionService, quizService, certificateService, projectService, authService, presentationService, presentationRegistrationService, moduleService, capstoneService } from '../services/apiService';
+import { Course, Lesson, Module, Assignment, Submission, Quiz, QuizResult, Certificate, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord, CapstoneProject, CapstoneSubmission } from '../types';
 import { BookOpen, Award, CheckCircle, Play, FileText, HelpCircle, GraduationCap, ArrowLeft, ArrowRight, ExternalLink, Check, Users, Send, Sparkles, Bot, X, Briefcase, Eye, ChevronDown, ChevronRight, Clock, Calendar, Download, Menu } from 'lucide-react';
 import { HeroBanner } from '../components/HeroBanner';
 import { getAuthenticatedFileUrl } from '../services/api';
@@ -302,6 +302,13 @@ export const InternDashboard: React.FC = () => {
   const [watchedVideos, setWatchedVideos] = useState<Record<string, boolean>>({});
   const [activeProjectWeekId, setActiveProjectWeekId] = useState<string | null>(null);
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+  const [courseModules, setCourseModules] = useState<Module[]>([]);
+  const [capstoneProjects, setCapstoneProjects] = useState<CapstoneProject[]>([]);
+  const [myCapstoneSubmissions, setMyCapstoneSubmissions] = useState<CapstoneSubmission[]>([]);
+  const [selectedCapstoneProject, setSelectedCapstoneProject] = useState<CapstoneProject | null>(null);
+  const [capstoneFileUploading, setCapstoneFileUploading] = useState(false);
+  const [capstoneFileUrl, setCapstoneFileUrl] = useState('');
+  const [capstoneFileName, setCapstoneFileName] = useState('');
   const [expandedLessonId, setExpandedLessonId] = useState<string | null>(null);
   const [isCourseDrawerOpen, setIsCourseDrawerOpen] = useState(false);
 
@@ -332,15 +339,6 @@ export const InternDashboard: React.FC = () => {
     }
   }, [location.search, enrolledCourses]);
 
-
-  useEffect(() => {
-    if (user?.id) {
-      const savedWatched = localStorage.getItem(`lms_watched_videos_${user.id}`);
-      setWatchedVideos(savedWatched ? JSON.parse(savedWatched) : {});
-    } else {
-      setWatchedVideos({});
-    }
-  }, [user?.id]);
 
   // Submission state
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
@@ -384,10 +382,14 @@ export const InternDashboard: React.FC = () => {
       const results = await quizService.getMyResults().catch(() => []);
       const subs = await submissionService.getMySubmissions().catch(() => []);
       const progress = await lessonService.getProgress().catch(() => []);
+      const videoProgress = await lessonService.getVideoWatchedProgress().catch(() => []);
+      const capstoneSubs = await capstoneService.getMySubmissions().catch(() => []);
+
       setAllCourses(domainCourses);
       setEnrolledCourses(enrolled);
       setCertificates(certs);
       setMyResults(results);
+      setMyCapstoneSubmissions(capstoneSubs);
 
       // Load presentations
       const presData = await presentationService.getAll().catch(() => []);
@@ -398,6 +400,12 @@ export const InternDashboard: React.FC = () => {
         completedMap[pId] = true;
       });
       setCompletedLessons(completedMap);
+
+      const watchedMap: Record<string, boolean> = {};
+      videoProgress.forEach((pId: string) => {
+        watchedMap[pId] = true;
+      });
+      setWatchedVideos(watchedMap);
 
       // Index submissions by assignmentId
       const subsMap: Record<string, Submission> = {};
@@ -417,6 +425,17 @@ export const InternDashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (activeCourse) {
+      capstoneService.getProjectsByCourse(activeCourse.id)
+        .then(setCapstoneProjects)
+        .catch(console.error);
+    } else {
+      setCapstoneProjects([]);
+      setSelectedCapstoneProject(null);
+    }
+  }, [activeCourse]);
+
   const handleEnroll = async (courseId: string) => {
     try {
       await courseService.enroll(courseId);
@@ -431,19 +450,19 @@ export const InternDashboard: React.FC = () => {
   const handleOpenStudyMode = async (course: Course) => {
     setLoading(true);
     try {
-      const detailedCourse = await courseService.getById(course.id);
+      const [detailedCourse, mods] = await Promise.all([
+        courseService.getById(course.id),
+        moduleService.getByCourse(course.id),
+      ]);
+      setCourseModules(mods);
       setActiveCourse(detailedCourse);
-      const weeks = detailedCourse.weeks || [];
-      // Select first module by default
-      if (weeks.length > 0) {
-        setActiveModuleId(weeks[0].id);
-        if (weeks[0].type === 'Project') {
-          setActiveProjectWeekId(weeks[0].id);
-          setActiveLesson(null);
-        } else {
-          setActiveProjectWeekId(null);
-          setActiveLesson(null);
-        }
+
+      // Prefer DB modules
+      const modules = mods.length > 0 ? mods : (detailedCourse.modules || []);
+      if (modules.length > 0) {
+        setActiveModuleId(modules[0].id);
+        setActiveProjectWeekId(null);
+        setActiveLesson(null);
       } else if (detailedCourse.lessons && detailedCourse.lessons.length > 0) {
         setActiveLesson(detailedCourse.lessons.sort((a, b) => a.order - b.order)[0]);
         setActiveProjectWeekId(null);
@@ -484,59 +503,92 @@ export const InternDashboard: React.FC = () => {
   };
 
   const getCourseWeeks = (course: Course) => {
+    // DB modules take priority (source of truth)
+    if (courseModules.length > 0 && courseModules[0].courseId === course.id) {
+      return courseModules.map((m) => ({ id: m.id, number: m.order, title: m.title, type: 'Study' as const }));
+    }
+    if (course.modules && course.modules.length > 0) {
+      return course.modules.map((m) => ({ id: m.id, number: m.order, title: m.title, type: 'Study' as const }));
+    }
     if (course.weeks && course.weeks.length > 0) {
-      return course.weeks;
+      return (course.weeks as any[]).map((w) => ({ id: w.id, number: w.number, title: w.title, type: (w.type || 'Study') as 'Study' | 'Project' }));
     }
     return [{ id: 'w_default', number: 1, title: 'Introduction', type: 'Study' as const }];
   };
 
   const getWeekItems = (weekId: string, course: Course) => {
-    const weeks = getCourseWeeks(course);
-    const isFirstWeek = weeks[0]?.id === weekId;
+    // Use DB-loaded modules if available for lesson grouping
+    const activeMods = courseModules.length > 0 && courseModules[0].courseId === course.id
+      ? courseModules
+      : (course.modules || []);
 
-    const lessons = (course.lessons || []).filter(l =>
-      l.weekId === weekId || (isFirstWeek && !l.weekId)
+    const mod = activeMods.find((m) => m.id === weekId);
+    const isFirstWeek = activeMods.length > 0 ? activeMods[0].id === weekId : true;
+
+    // Prefer lessons nested in module object; fallback to flat course.lessons
+    const moduleLessons = mod?.lessons || [];
+    const flatLessons = (course.lessons || []).filter(
+      (l) => l.moduleId === weekId || l.weekId === weekId || (isFirstWeek && !l.moduleId && !l.weekId),
     ).sort((a, b) => a.order - b.order);
+    const lessons = moduleLessons.length > 0 ? moduleLessons.sort((a, b) => a.order - b.order) : flatLessons;
 
-    const assignments = (course.assignments || []).filter(a =>
-      a.weekId === weekId || (isFirstWeek && !a.weekId)
+    const assignments = (course.assignments || []).filter(
+      (a) => a.weekId === weekId || (isFirstWeek && !a.weekId),
     );
-
-    const quizzes = (course.quizzes || []).filter(q =>
-      q.weekId === weekId || (isFirstWeek && !q.weekId)
+    const quizzes = (course.quizzes || []).filter(
+      (q) => q.weekId === weekId || (isFirstWeek && !q.weekId),
     );
 
     return { lessons, assignments, quizzes };
   };
 
   const calculateProgress = (course: Course) => {
-    const lessons = course.lessons || [];
-    const quizzes = course.quizzes || [];
-    const assignments = course.assignments || [];
+    const weeks = getCourseWeeks(course);
+    const capstoneWeeks = weeks.filter(w => w.title.toLowerCase().includes('capstone'));
+    const studyWeeks = weeks.filter(w => !w.title.toLowerCase().includes('capstone'));
 
-    const totalItems = lessons.length + quizzes.length + assignments.length;
+    let totalItems = 0;
+    let completedItemsCount = 0;
+
+    // Standard items
+    studyWeeks.forEach(sw => {
+      const { lessons, quizzes, assignments } = getWeekItems(sw.id, course);
+      totalItems += lessons.length + quizzes.length + assignments.length;
+      completedItemsCount += lessons.filter(l => completedLessons[l.id]).length +
+        quizzes.filter(q => myResults.some(r => r.quizId === q.id && r.passed)).length +
+        assignments.filter(a => {
+          const sub = mySubmissions[a.id];
+          if (!sub) return false;
+          if (sw.type === 'Project') {
+            return sub.isApproved === true;
+          }
+          return true;
+        }).length;
+    });
+
+    // Capstone items
+    capstoneWeeks.forEach(cw => {
+      totalItems += 1;
+      const isApproved = myCapstoneSubmissions.some(
+        sub => sub.project?.courseId === course.id && sub.status === 'APPROVED'
+      );
+      if (isApproved) completedItemsCount += 1;
+    });
+
     if (totalItems === 0) return 0;
-
-    const completedLessonsCount = lessons.filter(l => completedLessons[l.id]).length;
-    const passedQuizzesCount = quizzes.filter(q => myResults.some(r => r.quizId === q.id && r.passed)).length;
-    const submittedAssignmentsCount = assignments.filter(a => {
-      const sub = mySubmissions[a.id];
-      if (!sub) return false;
-      const weeks = getCourseWeeks(course);
-      const wObj = weeks.find(w => w.id === a.weekId);
-      if (wObj?.type === 'Project') {
-        return sub.isApproved === true;
-      }
-      return true;
-    }).length;
-
-    const completedItems = completedLessonsCount + passedQuizzesCount + submittedAssignmentsCount;
-    return Math.round((completedItems / totalItems) * 100);
+    return Math.round((completedItemsCount / totalItems) * 100);
   };
 
   const isWeekCompleted = (weekId: string, course: Course) => {
     const weeks = getCourseWeeks(course);
     const wObj = weeks.find(w => w.id === weekId);
+
+    if (wObj?.title.toLowerCase().includes('capstone')) {
+      return myCapstoneSubmissions.some(
+        (sub) => sub.project?.courseId === course.id && sub.status === 'APPROVED',
+      );
+    }
+
     const isProjectWeek = wObj?.type === 'Project';
 
     const { lessons, assignments, quizzes } = getWeekItems(weekId, course);
@@ -628,6 +680,15 @@ export const InternDashboard: React.FC = () => {
   const handleAssignmentFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedAssignment) return;
+
+    // Validate file type (PDF, DOC, DOCX only)
+    const allowedExtensions = ['pdf', 'doc', 'docx'];
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
+      alert('Only PDF (.pdf) and Microsoft Word (.doc, .docx) files are allowed.');
+      if (e.target) e.target.value = '';
+      return;
+    }
 
     setSubmitFileUploading(true);
     try {
@@ -936,6 +997,276 @@ export const InternDashboard: React.FC = () => {
     );
   };
 
+  const handleCapstoneSubmissionUpload = async (e: React.ChangeEvent<HTMLInputElement>, projectId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file extension
+    const allowedExtensions = ['pdf', 'doc', 'docx'];
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
+      alert('Only PDF (.pdf) and Microsoft Word (.doc, .docx) files are allowed.');
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    setCapstoneFileUploading(true);
+    try {
+      const res = await capstoneService.uploadSubmission(file, projectId);
+      setMyCapstoneSubmissions(prev => {
+        const otherSubs = prev.filter(s => s.projectId !== projectId);
+        return [...otherSubs, res.submission];
+      });
+      alert('Capstone project submitted successfully!');
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Failed to upload Capstone project.');
+    } finally {
+      setCapstoneFileUploading(false);
+    }
+  };
+
+  const renderCapstoneWorkspace = () => {
+    if (!activeCourse) return null;
+
+    // Check if the student has a submission for ANY project in this course
+    const courseProjectIds = capstoneProjects.map(p => p.id);
+    const existingSubmission = myCapstoneSubmissions.find(s => courseProjectIds.includes(s.projectId));
+
+    return (
+      <div className="space-y-6 text-left animate-fade-in">
+        <div className="p-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-amber-500/10 text-amber-500 rounded-2xl">
+              <Award className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black font-display text-slate-850 dark:text-white">Capstone Project Workspace</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Every course concludes with a real-world, industry-level Capstone Project. Choose one of the five projects below to complete your course validation.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {existingSubmission ? (
+          // Student has selected and submitted a project
+          <Card className="border border-border shadow-sm">
+            <CardHeader className="p-6 border-b border-border/40">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/20 bg-amber-500/[0.02] uppercase font-bold tracking-wider">
+                    Selected Capstone Project
+                  </Badge>
+                  <CardTitle className="text-lg font-bold mt-1.5">{existingSubmission.project?.title || 'Capstone Submission'}</CardTitle>
+                </div>
+                <Badge variant={
+                  existingSubmission.status === 'APPROVED' ? 'success' :
+                  existingSubmission.status === 'REJECTED' ? 'destructive' : 'outline'
+                } className="text-xs px-2.5 py-0.5 shadow-none uppercase font-bold">
+                  {existingSubmission.status}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              {/* Show project details */}
+              {(() => {
+                const currentProj = capstoneProjects.find(p => p.id === existingSubmission.projectId);
+                if (!currentProj) return null;
+                return (
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Problem Statement</h4>
+                      <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed mt-1">{currentProj.problemStatement}</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Objectives</h4>
+                        <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed mt-1 whitespace-pre-wrap">{currentProj.objectives}</p>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Required Technologies</h4>
+                        <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed mt-1">{currentProj.requiredTech}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="border-t border-border/40 pt-4 space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Your Submission</h4>
+                  <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-xl border border-border/40 max-w-md">
+                    <div className="p-2 bg-rose-50 dark:bg-rose-950/20 rounded-lg text-rose-500 border border-rose-200/40 dark:border-rose-900/30">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-foreground truncate">{existingSubmission.fileName}</p>
+                      <p className="text-[10px] text-muted-foreground">Submitted on {new Date(existingSubmission.submittedAt).toLocaleDateString()}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(getAuthenticatedFileUrl(existingSubmission.fileUrl), '_blank')}
+                      className="text-xs"
+                    >
+                      <Download className="h-3.5 w-3.5 mr-1" /> View/Download
+                    </Button>
+                  </div>
+                </div>
+
+                {existingSubmission.reviewedAt && (
+                  <div className={`p-4 rounded-xl border text-xs space-y-2 ${
+                    existingSubmission.status === 'APPROVED'
+                      ? 'bg-emerald-500/[0.02] border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                      : 'bg-destructive/[0.02] border-destructive/20 text-destructive'
+                  }`}>
+                    <p className="font-bold text-sm flex items-center gap-2">
+                      {existingSubmission.status === 'APPROVED' ? <CheckCircle className="h-5 w-5 text-emerald-500" /> : <X className="h-5 w-5 text-destructive" />}
+                      {existingSubmission.status === 'APPROVED' ? 'Approved & Completed!' : 'Needs Revision'}
+                    </p>
+                    {existingSubmission.marks !== null && (
+                      <p className="text-slate-800 dark:text-slate-200"><strong className="text-foreground">Score:</strong> {existingSubmission.marks} / 100</p>
+                    )}
+                    {existingSubmission.remarks && (
+                      <p className="text-slate-650 dark:text-slate-350"><strong className="text-foreground">Coordinator Remarks:</strong> {existingSubmission.remarks}</p>
+                    )}
+                  </div>
+                )}
+
+                {existingSubmission.status === 'REJECTED' && (
+                  <div className="border-t border-border/40 pt-4 space-y-3">
+                    <h5 className="text-xs font-bold text-amber-600 dark:text-amber-400">↻ Re-submit Final Work</h5>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                      <div className="relative w-full sm:w-auto">
+                        <input
+                          type="file"
+                          id="re-upload-capstone-file"
+                          className="hidden"
+                          accept=".pdf,.doc,.docx"
+                          onChange={(e) => handleCapstoneSubmissionUpload(e, existingSubmission.projectId)}
+                        />
+                        <Button
+                          disabled={capstoneFileUploading}
+                          onClick={() => document.getElementById('re-upload-capstone-file')?.click()}
+                          className="w-full sm:w-auto h-9 text-xs"
+                        >
+                          <Upload className="h-3.5 w-3.5 mr-1.5" />
+                          {capstoneFileUploading ? 'Uploading...' : 'Upload PDF/DOC/DOCX'}
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-normal">
+                        Select a new file. Once uploaded, your project status will return to pending review.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          // Student needs to select one of the 5 projects
+          <div className="space-y-4">
+            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Available Capstone Projects</h4>
+            {capstoneProjects.length === 0 ? (
+              <div className="p-8 text-center border-2 border-dashed border-border rounded-2xl bg-secondary/5 text-muted-foreground text-xs font-medium">
+                No capstone projects have been configured for this course by the Project Coordinator yet.
+              </div>
+            ) : selectedCapstoneProject ? (
+              // Selected a project to start
+              <Card className="border border-[#0F4C81]/30 bg-[#0F4C81]/[0.01]">
+                <CardHeader className="p-6 border-b border-border/40 flex flex-row items-center justify-between">
+                  <div>
+                    <Badge variant="outline" className="text-[9px] uppercase tracking-wider text-[#17A2B8] border-[#17A2B8]/20 bg-[#17A2B8]/[0.02]">
+                      New Submission Builder
+                    </Badge>
+                    <CardTitle className="text-base font-bold mt-1">{selectedCapstoneProject.title}</CardTitle>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedCapstoneProject(null)} className="h-8 px-2 text-xs">
+                    Cancel Selection
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-6 space-y-5 text-xs leading-relaxed text-slate-750 dark:text-slate-300">
+                  <div className="space-y-3.5">
+                    <div>
+                      <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Problem Statement:</strong>
+                      <p>{selectedCapstoneProject.problemStatement}</p>
+                    </div>
+                    <div>
+                      <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Objectives:</strong>
+                      <p className="whitespace-pre-wrap">{selectedCapstoneProject.objectives}</p>
+                    </div>
+                    <div>
+                      <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Required Technologies:</strong>
+                      <p>{selectedCapstoneProject.requiredTech}</p>
+                    </div>
+                    <div>
+                      <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Deliverables:</strong>
+                      <p className="whitespace-pre-wrap">{selectedCapstoneProject.deliverables}</p>
+                    </div>
+                    <div>
+                      <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Submission Instructions:</strong>
+                      <p className="whitespace-pre-wrap">{selectedCapstoneProject.instructions}</p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border/40 pt-5 space-y-3">
+                    <strong className="text-foreground uppercase tracking-wide block text-[10px] text-muted-foreground">Upload Final Project Work:</strong>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                      <div className="relative">
+                        <input
+                          type="file"
+                          id="upload-capstone-file"
+                          className="hidden"
+                          accept=".pdf,.doc,.docx"
+                          onChange={(e) => handleCapstoneSubmissionUpload(e, selectedCapstoneProject.id)}
+                        />
+                        <Button
+                          disabled={capstoneFileUploading}
+                          onClick={() => document.getElementById('upload-capstone-file')?.click()}
+                          className="w-full sm:w-auto h-9 text-xs"
+                        >
+                          <Upload className="h-3.5 w-3.5 mr-1.5" />
+                          {capstoneFileUploading ? 'Uploading...' : 'Upload PDF/DOC/DOCX'}
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-normal">
+                        Allowed formats: PDF (.pdf) and Microsoft Word (.doc, .docx). Upload directly to S3.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              // Display the 5 projects list
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {capstoneProjects.slice(0, 5).map((project, idx) => (
+                  <Card key={project.id} className="border border-border/70 hover:border-[#0F4C81]/30 hover:shadow-md transition-all flex flex-col justify-between">
+                    <CardHeader className="p-5 pb-3">
+                      <Badge variant="outline" className="text-[9px] uppercase tracking-wider mb-2 bg-slate-50 dark:bg-slate-900 border-border">
+                        Project Option {idx + 1}
+                      </Badge>
+                      <CardTitle className="text-sm font-bold text-slate-850 dark:text-white leading-snug line-clamp-1">{project.title}</CardTitle>
+                      <CardDescription className="text-xs line-clamp-3 mt-1.5 leading-relaxed">{project.problemStatement}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-5 pt-0 mt-3 flex items-center justify-between gap-3 border-t border-border/30 pt-3">
+                      <span className="text-[10px] font-semibold text-muted-foreground truncate max-w-[120px]">
+                        Tech: {project.requiredTech}
+                      </span>
+                      <Button size="xs" onClick={() => setSelectedCapstoneProject(project)} className="text-[10px] h-7 px-2">
+                        Start Project
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderDashboard = () => {
     const completedCount = Object.values(completedLessons).filter(Boolean).length;
     const passedQuizzesCount = myResults.filter(r => r.passed).length;
@@ -1132,6 +1463,9 @@ export const InternDashboard: React.FC = () => {
       const selectedWeek = weeks.find(w => w.id === activeModuleId);
       const selectedWeekIdx = weeks.findIndex(w => w.id === activeModuleId);
       const isProjectWeek = selectedWeek?.type === 'Project';
+      const isCapstoneModule = selectedWeek?.title
+        ? selectedWeek.title.toLowerCase().includes('capstone')
+        : false;
       const { lessons: moduleItems, quizzes: moduleQuizzes, assignments: moduleAssignments } =
         activeModuleId ? getWeekItems(activeModuleId, activeCourse) : { lessons: [], quizzes: [], assignments: [] };
       const details = getWeekProgressDetails(activeCourse);
@@ -1528,7 +1862,9 @@ export const InternDashboard: React.FC = () => {
 
             {/* RIGHT COLUMN — Lesson Accordion (70%) */}
             <div className="flex-1 min-w-0 flex flex-col gap-4">
-              {isProjectWeek && activeProjectWeekId ? (
+              {isCapstoneModule ? (
+                renderCapstoneWorkspace()
+              ) : isProjectWeek && activeProjectWeekId ? (
                 renderProjectWorkspace()
               ) : selectedWeek ? (
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
@@ -1600,13 +1936,14 @@ export const InternDashboard: React.FC = () => {
                                 </Card>
                               )}
                               {lesson.videoUrl && (
-                                <VideoPlayer url={lesson.videoUrl} lessonId={lesson.id} onPlayOrWatched={() => {
+                                <VideoPlayer url={lesson.videoUrl} lessonId={lesson.id} onPlayOrWatched={async () => {
                                   if (!watchedVideos[lesson.id]) {
-                                    setWatchedVideos(prev => {
-                                      const next = { ...prev, [lesson.id]: true };
-                                      if (user?.id) localStorage.setItem(`lms_watched_videos_${user.id}`, JSON.stringify(next));
-                                      return next;
-                                    });
+                                    setWatchedVideos(prev => ({ ...prev, [lesson.id]: true }));
+                                    try {
+                                      await lessonService.markVideoWatched(lesson.id);
+                                    } catch (err) {
+                                      console.error("Failed to mark video watched in database", err);
+                                    }
                                   }
                                 }} />
                               )}

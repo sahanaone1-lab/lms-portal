@@ -19,11 +19,15 @@ export interface User {
   createdAt: string;
 }
 
-export interface CourseWeek {
+export interface Module {
   id: string;
-  number: number;
   title: string;
-  type?: 'Study' | 'Project';
+  description?: string;
+  order: number;
+  courseId: string;
+  lessons?: Lesson[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Course {
@@ -34,6 +38,7 @@ export interface Course {
   coverImage?: string;
   projectCoordinatorId: string;
   projectCoordinatorName?: string;
+  modules?: Module[];
   lessons?: Lesson[];
   assignments?: Assignment[];
   quizzes?: Quiz[];
@@ -44,7 +49,7 @@ export interface Course {
   duration?: string;
   learningOutcomes?: string[];
   status?: 'Draft' | 'Published' | 'Archived';
-  weeks?: CourseWeek[];
+  weeks?: Module[]; // kept for backward compat — use modules[] as source of truth
   brochureUrl?: string;
   brochureName?: string;
   brochureFileName?: string;
@@ -64,6 +69,7 @@ export interface Lesson {
   order: number;
   courseId: string;
   weekId?: string;
+  moduleId?: string;
   createdAt: string;
 }
 
@@ -72,7 +78,7 @@ export interface Assignment {
   title: string;
   instruction: string;
   attachmentUrl?: string;
-  dueDate: string;
+  dueDate?: string;
   courseId: string;
   weekId?: string;
   maxMarks?: number;
@@ -255,5 +261,39 @@ export interface PresentationRegistrationRecord {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CapstoneProject {
+  id: string;
+  title: string;
+  problemStatement: string;
+  objectives: string;
+  requiredTech: string;
+  deliverables: string;
+  instructions: string;
+  courseId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CapstoneSubmission {
+  id: string;
+  studentId: string;
+  projectId: string;
+  project?: {
+    title: string;
+    courseId: string;
+  };
+  studentName?: string;
+  studentEmail?: string;
+  studentEmployeeId?: string;
+  studentDomain?: string;
+  fileUrl: string;
+  fileName: string;
+  marks?: number;
+  remarks?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  submittedAt: string;
+  reviewedAt?: string;
 }
 

@@ -21,7 +21,7 @@ export class AssignmentsService {
     courseId: string,
     title: string,
     instruction: string,
-    dueDate: Date,
+    dueDate: Date | string | null | undefined,
     userId: string,
     role: Role,
     attachmentUrl?: string,
@@ -46,7 +46,7 @@ export class AssignmentsService {
         title,
         instruction,
         attachmentUrl,
-        dueDate: new Date(dueDate),
+        dueDate: dueDate ? new Date(dueDate) : null,
         weekId,
         courseId,
       },
@@ -55,7 +55,7 @@ export class AssignmentsService {
 
   async update(
     id: string,
-    data: { title?: string; instruction?: string; dueDate?: Date; weekId?: string },
+    data: { title?: string; instruction?: string; dueDate?: Date | string | null; weekId?: string },
     userId: string,
     role: Role,
   ) {
@@ -74,9 +74,14 @@ export class AssignmentsService {
       }
     }
 
+    const updatedData = { ...data };
+    if (updatedData.dueDate !== undefined) {
+      updatedData.dueDate = updatedData.dueDate ? new Date(updatedData.dueDate) : null;
+    }
+
     return this.prisma.assignment.update({
       where: { id },
-      data: data.dueDate ? { ...data, dueDate: new Date(data.dueDate) } : data,
+      data: updatedData as any,
     });
   }
 

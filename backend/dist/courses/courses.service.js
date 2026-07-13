@@ -35,6 +35,14 @@ let CoursesService = class CoursesService {
             where: { id },
             include: {
                 projectCoordinator: { select: { name: true } },
+                modules: {
+                    orderBy: { order: 'asc' },
+                    include: {
+                        lessons: {
+                            orderBy: { order: 'asc' },
+                        },
+                    },
+                },
                 lessons: { orderBy: { order: 'asc' } },
                 assignments: true,
                 quizzes: true,

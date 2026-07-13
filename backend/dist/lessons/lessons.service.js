@@ -25,7 +25,7 @@ let LessonsService = class LessonsService {
             orderBy: { order: 'asc' },
         });
     }
-    async create(courseId, title, content, videoUrl, order, userId, role, attachmentUrl, pdfResource, duration, weekId) {
+    async create(courseId, title, content, videoUrl, order, userId, role, attachmentUrl, pdfResource, duration, weekId, moduleId) {
         const course = await this.prisma.course.findUnique({
             where: { id: courseId },
         });
@@ -53,6 +53,8 @@ let LessonsService = class LessonsService {
                 }
             }
         }
+        // If moduleId provided, keep weekId in sync for backward compat
+        const finalWeekId = weekId || moduleId || undefined;
         return this.prisma.lesson.create({
             data: {
                 title,
@@ -61,7 +63,8 @@ let LessonsService = class LessonsService {
                 attachmentUrl,
                 pdfResource,
                 duration,
-                weekId,
+                weekId: finalWeekId,
+                moduleId: moduleId || weekId || undefined,
                 order,
                 courseId,
             },
@@ -96,6 +99,10 @@ let LessonsService = class LessonsService {
                 }
             }
         }
+        // Keep weekId in sync with moduleId for backward compat
+        if (updatedData.moduleId && !updatedData.weekId) {
+            updatedData.weekId = updatedData.moduleId;
+        }
         return this.prisma.lesson.update({
             where: { id },
             data: updatedData,
@@ -120,25 +127,35 @@ let LessonsService = class LessonsService {
         return { success: true };
     }
     async toggleProgress(lessonId, studentId, completed) {
-        if (completed) {
-            return this.prisma.lessonProgress.upsert({
-                where: { studentId_lessonId: { studentId, lessonId } },
-                update: {},
-                create: { studentId, lessonId },
-            });
-        }
-        else {
-            return this.prisma.lessonProgress.deleteMany({
-                where: { studentId, lessonId },
-            });
-        }
+        return this.prisma.lessonProgress.upsert({
+            where: { studentId_lessonId: { studentId, lessonId } },
+            update: { completed },
+            create: { studentId, lessonId, completed },
+        });
     }
     async getProgress(studentId) {
         const records = await this.prisma.lessonProgress.findMany({
-            where: { studentId },
+            where: { studentId, completed: true },
             select: { lessonId: true },
         });
         return records.map((r) => r.lessonId);
+    }
+    async getVideoProgress(studentId) {
+        const records = await this.prisma.lessonProgress.findMany({
+            where: { studentId, videoWatched: true },
+            select: { lessonId: true },
+        });
+        return records.map((r) => r.lessonId);
+    }
+    async markVideoWatched(lessonId, studentId) {
+        const lesson = await this.prisma.lesson.findUnique({ where: { id: lessonId } });
+        if (!lesson)
+            throw new common_1.NotFoundException('Lesson not found');
+        return this.prisma.lessonProgress.upsert({
+            where: { studentId_lessonId: { studentId, lessonId } },
+            update: { videoWatched: true },
+            create: { studentId, lessonId, videoWatched: true, completed: false },
+        });
     }
     async suggestReplacement(id) {
         const lesson = await this.prisma.lesson.findUnique({

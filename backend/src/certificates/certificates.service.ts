@@ -86,8 +86,30 @@ export class CertificatesService {
     // 3. Verify course weeks and projects
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
+      include: {
+        modules: true,
+      },
     });
     if (!course) throw new NotFoundException('Course not found');
+
+    // Verify Capstone Project if course has a Capstone module
+    const hasCapstoneModule = course.modules.some(
+      (m) => m.title && m.title.toLowerCase().includes('capstone'),
+    );
+    if (hasCapstoneModule) {
+      const capstoneSub = await this.prisma.capstoneSubmission.findFirst({
+        where: {
+          studentId,
+          status: 'APPROVED',
+          project: { courseId },
+        },
+      });
+      if (!capstoneSub) {
+        throw new BadRequestException(
+          'Cannot claim certificate. Please choose a Capstone Project, submit it, and obtain coordinator approval first.',
+        );
+      }
+    }
 
     const weeks = (course.weeks as any[]) || [];
     const projectWeekIds = weeks.filter((w) => w.type === 'Project').map((w) => w.id);

@@ -35,6 +35,17 @@ let SubmissionsController = class SubmissionsController {
             throw new common_1.BadRequestException('No file uploaded');
         if (!assignmentId)
             throw new common_1.BadRequestException('assignmentId is required');
+        // Validate file type (PDF, DOC, DOCX only)
+        const allowedMimeTypes = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ];
+        const allowedExtensions = ['pdf', 'doc', 'docx'];
+        const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
+        if (!allowedMimeTypes.includes(file.mimetype) && !allowedExtensions.includes(fileExtension || '')) {
+            throw new common_1.BadRequestException('Only PDF (.pdf) and Microsoft Word (.doc, .docx) files are allowed');
+        }
         // Upload to S3 directly with 'file-' prefix so AuthGuard handles it correctly
         const s3ObjectKey = await this.s3Service.uploadFile(file, 'file-');
         const fileUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/uploads/${encodeURIComponent(s3ObjectKey)}`;
