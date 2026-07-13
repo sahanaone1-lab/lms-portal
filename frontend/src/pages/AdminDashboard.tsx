@@ -3,9 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
 import { useToast } from '../components/Toast';
 import { Button, Input, Select, Textarea, Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Modal, Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui';
-import { userService, courseService, lessonService, assignmentService, quizService, domainService, projectService, presentationService, presentationRegistrationService } from '../services/apiService';
+import { userService, courseService, lessonService, assignmentService, quizService, domainService, projectService, presentationService, presentationRegistrationService, capstoneService } from '../services/apiService';
 import { VideoPlayer } from '../components/VideoPlayer';
-import { User, Course, Role, Lesson, Assignment, Quiz, Question, Domain, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord } from '../types';
+import { User, Course, Role, Lesson, Assignment, Quiz, Question, Domain, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord, CapstoneProject } from '../types';
 import { Users, BookOpen, GraduationCap, Award, Plus, Trash2, Edit2, ShieldAlert, ListTodo, FileCheck, Check, ChevronDown, ChevronUp, Play, FileText, HelpCircle, Edit, Trash, Eye, X, CheckCircle, Video, Briefcase, Upload, Grid, Download, Search, Calendar } from 'lucide-react';
 import { HeroBanner } from '../components/HeroBanner';
 import { getAuthenticatedFileUrl } from '../services/api';
@@ -113,6 +113,19 @@ export const AdminDashboard: React.FC = () => {
   const [assignmentSubtype, setAssignmentSubtype] = useState('File Upload');
   const [assignmentRules, setAssignmentRules] = useState('');
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
+
+  // Capstone Project state
+  const [capstoneProjects, setCapstoneProjects] = useState<CapstoneProject[]>([]);
+  const [isCapstoneModalOpen, setIsCapstoneModalOpen] = useState(false);
+  const [editingCapstoneProject, setEditingCapstoneProject] = useState<CapstoneProject | null>(null);
+
+  // Capstone Project Form
+  const [capstoneTitle, setCapstoneTitle] = useState('');
+  const [capstoneProblem, setCapstoneProblem] = useState('');
+  const [capstoneObjectives, setCapstoneObjectives] = useState('');
+  const [capstoneTech, setCapstoneTech] = useState('');
+  const [capstoneDeliverables, setCapstoneDeliverables] = useState('');
+  const [capstoneInstructions, setCapstoneInstructions] = useState('');
 
   // Quiz state
   const [quizTitle, setQuizTitle] = useState('');
@@ -599,6 +612,8 @@ export const AdminDashboard: React.FC = () => {
   const handleSelectCourse = async (course: Course) => {
     try {
       const detailed = await courseService.getById(course.id);
+      const capProjs = await capstoneService.getProjectsByCourse(course.id).catch(() => []);
+      setCapstoneProjects(capProjs);
       setSelectedCourse(detailed);
     } catch (err) {
       console.error(err);
@@ -1159,6 +1174,78 @@ export const AdminDashboard: React.FC = () => {
           if (selectedCourse) handleSelectCourse(selectedCourse);
         } catch (err: any) {
           toast.error('Failed to delete quiz');
+        }
+      },
+    });
+  };
+
+  const handleSaveCapstoneProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCourse || !capstoneTitle) return;
+    try {
+      if (editingCapstoneProject) {
+        await capstoneService.updateProject(editingCapstoneProject.id, {
+          title: capstoneTitle,
+          problemStatement: capstoneProblem,
+          objectives: capstoneObjectives,
+          requiredTech: capstoneTech,
+          deliverables: capstoneDeliverables,
+          instructions: capstoneInstructions,
+        });
+        alert('Capstone project updated successfully!');
+      } else {
+        await capstoneService.createProject({
+          courseId: selectedCourse.id,
+          title: capstoneTitle,
+          problemStatement: capstoneProblem,
+          objectives: capstoneObjectives,
+          requiredTech: capstoneTech,
+          deliverables: capstoneDeliverables,
+          instructions: capstoneInstructions,
+        });
+        alert('Capstone project created successfully!');
+      }
+      setIsCapstoneModalOpen(false);
+      setCapstoneTitle('');
+      setCapstoneProblem('');
+      setCapstoneObjectives('');
+      setCapstoneTech('');
+      setCapstoneDeliverables('');
+      setCapstoneInstructions('');
+      setEditingCapstoneProject(null);
+
+      const updatedProjs = await capstoneService.getProjectsByCourse(selectedCourse.id);
+      setCapstoneProjects(updatedProjs);
+    } catch (err) {
+      alert('Failed to save Capstone project');
+    }
+  };
+
+  const handleEditCapstoneProject = (proj: CapstoneProject) => {
+    setEditingCapstoneProject(proj);
+    setCapstoneTitle(proj.title);
+    setCapstoneProblem(proj.problemStatement);
+    setCapstoneObjectives(proj.objectives);
+    setCapstoneTech(proj.requiredTech);
+    setCapstoneDeliverables(proj.deliverables);
+    setCapstoneInstructions(proj.instructions);
+    setIsCapstoneModalOpen(true);
+  };
+
+  const handleDeleteCapstoneProject = (id: string) => {
+    if (!selectedCourse) return;
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete Capstone Project',
+      message: 'Are you sure you want to delete this Capstone project?',
+      onConfirm: async () => {
+        try {
+          await capstoneService.deleteProject(id);
+          toast.success('Capstone project deleted successfully');
+          const updatedProjs = await capstoneService.getProjectsByCourse(selectedCourse.id);
+          setCapstoneProjects(updatedProjs);
+        } catch (err) {
+          toast.error('Failed to delete Capstone project');
         }
       },
     });
@@ -1978,6 +2065,20 @@ export const AdminDashboard: React.FC = () => {
                                   <Button variant="outline" size="sm" onClick={() => { setActiveWeekId(week.id); setEditingAssignment(null); setAssignmentTitle(''); setAssignmentInstructions(''); setAssignmentAttachment(''); setAssignmentDue(''); setAssignmentMaxMarks('100'); setAssignmentSubtype('File Upload'); setAssignmentRules(''); setIsAssignmentModalOpen(true); }} className="h-7 text-[10px] px-2">
                                     + Task
                                   </Button>
+                                  {week.title.toLowerCase().includes('capstone') && (
+                                    <Button variant="outline" size="sm" onClick={() => {
+                                      setEditingCapstoneProject(null);
+                                      setCapstoneTitle('');
+                                      setCapstoneProblem('');
+                                      setCapstoneObjectives('');
+                                      setCapstoneTech('');
+                                      setCapstoneDeliverables('');
+                                      setCapstoneInstructions('');
+                                      setIsCapstoneModalOpen(true);
+                                    }} className="h-7 text-[10px] px-2 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/25">
+                                      + Capstone
+                                    </Button>
+                                  )}
                                   <Button variant="ghost" size="sm" onClick={() => handleDeleteWeek(week.id)} className="h-7 text-[10px] px-2 text-destructive hover:bg-destructive/10">
                                     Delete Module
                                   </Button>
@@ -1987,7 +2088,45 @@ export const AdminDashboard: React.FC = () => {
                               {/* Accordion Content Panel */}
                               {isExpanded && (
                                 <div className="p-4 bg-background space-y-4 animate-fade-in border-t border-border/40">
-                                  {lessons.length === 0 && quizzes.length === 0 && assignments.length === 0 ? (
+                                  {week.title.toLowerCase().includes('capstone') ? (
+                                    <div className="space-y-4 text-left">
+                                      <div className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider mb-1 flex items-center gap-1.5"><Award className="h-3.5 w-3.5 text-amber-500" /> Capstone Project Options (Course Level)</div>
+                                      {capstoneProjects.length === 0 ? (
+                                        <div className="py-8 text-center text-xs text-muted-foreground border border-dashed border-amber-500/30 rounded-lg bg-amber-500/[0.01]">
+                                          No Capstone projects created yet. Click "+ Capstone" above to define the 5 projects.
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-2">
+                                          {capstoneProjects.map((proj, pIdx) => (
+                                            <div key={proj.id} className="p-3 border border-border rounded-lg bg-secondary/5 flex items-center justify-between hover:bg-secondary/10 transition-all">
+                                              <div className="flex items-start space-x-3 text-left">
+                                                <div className="mt-0.5 p-1 bg-amber-500/10 text-amber-500 rounded">
+                                                  <Award className="h-3.5 w-3.5" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                  <p className="text-xs font-bold text-foreground truncate">{proj.title}</p>
+                                                  <p className="text-[10px] text-muted-foreground truncate max-w-sm mt-0.5">{proj.problemStatement}</p>
+                                                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                                                    <span className="text-[8px] font-bold uppercase bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded">
+                                                      Tech: {proj.requiredTech}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <div className="flex items-center gap-1 shrink-0 ml-4">
+                                                <Button variant="ghost" size="sm" onClick={() => handleEditCapstoneProject(proj)} className="h-7 text-[10px] px-2 text-[#0F4C81]">
+                                                  <Edit className="h-3 w-3 mr-1" /> Edit
+                                                </Button>
+                                                <Button variant="ghost" size="sm" onClick={() => handleDeleteCapstoneProject(proj.id)} className="h-7 text-[10px] px-2 text-destructive">
+                                                  <Trash className="h-3 w-3 mr-1" /> Delete
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : lessons.length === 0 && quizzes.length === 0 && assignments.length === 0 ? (
                                     <div className="py-8 text-center text-xs text-muted-foreground border border-dashed rounded-lg">
                                       No items added to this module yet. Use the buttons above to build curriculum contents.
                                     </div>
@@ -3378,6 +3517,71 @@ export const AdminDashboard: React.FC = () => {
             <Button variant="ghost" type="button" onClick={() => setIsDomainModalOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={loading}>
               {selectedDomainItem ? "Save Changes" : "Create Domain"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Create/Edit Capstone Project */}
+      <Modal
+        isOpen={isCapstoneModalOpen}
+        onClose={() => setIsCapstoneModalOpen(false)}
+        title={editingCapstoneProject ? "Edit Capstone Project" : "Add Course Capstone Project"}
+        sizeClassName="max-w-3xl w-full"
+      >
+        <form onSubmit={handleSaveCapstoneProject} className="p-6 space-y-4 text-left">
+          <Input
+            label="Project Title"
+            placeholder="e.g. Real-time Distributed Analytics Pipeline"
+            value={capstoneTitle}
+            onChange={(e) => setCapstoneTitle(e.target.value)}
+            required
+          />
+          <Textarea
+            label="Problem Statement"
+            placeholder="Provide details about the real-world business problem interns will solve..."
+            value={capstoneProblem}
+            onChange={(e) => setCapstoneProblem(e.target.value)}
+            required
+            rows={3}
+          />
+          <Textarea
+            label="Project Objectives"
+            placeholder="List core objectives / requirements (one per line)..."
+            value={capstoneObjectives}
+            onChange={(e) => setCapstoneObjectives(e.target.value)}
+            required
+            rows={3}
+          />
+          <Input
+            label="Required Technologies"
+            placeholder="e.g. NestJS, PostgreSQL, React, AWS S3, Redis"
+            value={capstoneTech}
+            onChange={(e) => setCapstoneTech(e.target.value)}
+            required
+          />
+          <Textarea
+            label="Expected Deliverables"
+            placeholder="List final submission deliverables..."
+            value={capstoneDeliverables}
+            onChange={(e) => setCapstoneDeliverables(e.target.value)}
+            required
+            rows={3}
+          />
+          <Textarea
+            label="Submission Instructions"
+            placeholder="Provide code compilation, PDF summary report upload instructions..."
+            value={capstoneInstructions}
+            onChange={(e) => setCapstoneInstructions(e.target.value)}
+            required
+            rows={3}
+          />
+          <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
+            <Button type="button" variant="outline" onClick={() => setIsCapstoneModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit">
+              {editingCapstoneProject ? 'Update Project' : 'Save Project'}
             </Button>
           </div>
         </form>
