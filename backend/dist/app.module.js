@@ -27,6 +27,7 @@ const presentation_registrations_module_1 = require("./presentation-registration
 const aws_module_1 = require("./aws/aws.module");
 const modules_module_1 = require("./modules/modules.module");
 const capstone_module_1 = require("./capstone/capstone.module");
+const project_submissions_module_1 = require("./project-submissions/project-submissions.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -50,6 +51,7 @@ exports.AppModule = AppModule = __decorate([
             aws_module_1.AwsModule,
             modules_module_1.ModulesModule,
             capstone_module_1.CapstoneModule,
+            project_submissions_module_1.ProjectSubmissionsModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

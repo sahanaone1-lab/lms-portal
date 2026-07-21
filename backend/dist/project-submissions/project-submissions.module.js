@@ -6,22 +6,21 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SubmissionsModule = void 0;
+exports.ProjectSubmissionsModule = void 0;
 const common_1 = require("@nestjs/common");
-const submissions_service_1 = require("./submissions.service");
-const submissions_controller_1 = require("./submissions.controller");
-const uploads_controller_1 = require("./uploads.controller");
+const project_submissions_controller_1 = require("./project-submissions.controller");
+const project_submissions_service_1 = require("./project-submissions.service");
 const prisma_module_1 = require("../prisma/prisma.module");
 const aws_module_1 = require("../aws/aws.module");
-let SubmissionsModule = class SubmissionsModule {
+let ProjectSubmissionsModule = class ProjectSubmissionsModule {
 };
-exports.SubmissionsModule = SubmissionsModule;
-exports.SubmissionsModule = SubmissionsModule = __decorate([
+exports.ProjectSubmissionsModule = ProjectSubmissionsModule;
+exports.ProjectSubmissionsModule = ProjectSubmissionsModule = __decorate([
     (0, common_1.Module)({
         imports: [prisma_module_1.PrismaModule, aws_module_1.AwsModule],
-        providers: [submissions_service_1.SubmissionsService],
-        controllers: [submissions_controller_1.SubmissionsController, uploads_controller_1.UploadsController],
-        exports: [submissions_service_1.SubmissionsService],
+        controllers: [project_submissions_controller_1.ProjectSubmissionsController],
+        providers: [project_submissions_service_1.ProjectSubmissionsService],
+        exports: [project_submissions_service_1.ProjectSubmissionsService],
     })
-], SubmissionsModule);
-//# sourceMappingURL=submissions.module.js.map
+], ProjectSubmissionsModule);
+//# sourceMappingURL=project-submissions.module.js.map

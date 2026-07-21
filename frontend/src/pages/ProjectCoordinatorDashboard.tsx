@@ -150,6 +150,12 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
   const [capstoneTech, setCapstoneTech] = useState('');
   const [capstoneDeliverables, setCapstoneDeliverables] = useState('');
   const [capstoneInstructions, setCapstoneInstructions] = useState('');
+  const [capstoneDifficulty, setCapstoneDifficulty] = useState('Intermediate');
+  const [capstoneDuration, setCapstoneDuration] = useState('4 Weeks');
+  const [capstoneCategory, setCapstoneCategory] = useState('');
+  const [capstoneEvaluation, setCapstoneEvaluation] = useState('');
+  const [capstoneSampleOutput, setCapstoneSampleOutput] = useState('');
+  const [capstoneReferences, setCapstoneReferences] = useState('');
 
   // Capstone Submission Review
   const [selectedCapstoneSub, setSelectedCapstoneSub] = useState<CapstoneSubmission | null>(null);
@@ -245,19 +251,31 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     }
   }, [location.search, courses, submissions]);
 
-  // Get modules for a course — from courseModules state (loaded via moduleService)
   const getCourseWeeks = (course: Course) => {
-    // Use DB-loaded modules if available, else fall back to course.weeks JSON
+    let list: any[] = [];
     if (courseModules.length > 0 && courseModules[0].courseId === course.id) {
-      return courseModules.map((m) => ({ id: m.id, number: m.order, title: m.title }));
+      list = courseModules.map((m) => ({ id: m.id, number: m.order, title: m.title, type: 'Study' as const }));
+    } else if (course.modules && course.modules.length > 0) {
+      list = course.modules.map((m) => ({ id: m.id, number: m.order, title: m.title, type: 'Study' as const }));
+    } else if (course.weeks && course.weeks.length > 0) {
+      list = (course.weeks as any[]).map((w) => ({ id: w.id, number: w.number, title: w.title, type: 'Study' as const }));
+    } else {
+      list = [{ id: 'w_default', number: 1, title: 'Introduction', type: 'Study' as const }];
     }
-    if (course.modules && course.modules.length > 0) {
-      return course.modules.map((m) => ({ id: m.id, number: m.order, title: m.title }));
+
+    if (capstoneProjects && capstoneProjects.length > 0) {
+      capstoneProjects.forEach((proj, idx) => {
+        list.push({
+          id: `capstone-week-${proj.id}`,
+          number: list.length + 1,
+          title: proj.title,
+          type: 'Project' as const,
+          capstoneProject: proj
+        });
+      });
     }
-    if (course.weeks && course.weeks.length > 0) {
-      return course.weeks.map((w: any) => ({ id: w.id, number: w.number, title: w.title }));
-    }
-    return [{ id: 'w_default', number: 1, title: 'Introduction' }];
+
+    return list;
   };
 
   const getWeekItems = (weekId: string, course: Course) => {
@@ -285,7 +303,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     return { lessons, assignments, quizzes };
   };
 
-  const getDueDateBadgeInfo = (dueDateStr: string) => {
+  const getDueDateBadgeInfo = (dueDateStr?: string) => {
     if (!dueDateStr) return { label: 'No Due Date', variant: 'outline' as const };
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -338,7 +356,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
 
   const handleBrochureUpload = async (file: File) => {
     if (!selectedCourse) return;
-    
+
     // File validation
     const extension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
     const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
@@ -346,7 +364,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       toast.error('Only PDF and image files (PNG, JPG, JPEG, WEBP) are allowed');
       return;
     }
-    
+
     try {
       setBrochureUploading(true);
       setBrochureProgress(0);
@@ -356,11 +374,11 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
         (percent: number) => setBrochureProgress(percent)
       );
       toast.success('Brochure uploaded successfully');
-      
+
       // Update selected course details in UI
       const detailed = await courseService.getById(selectedCourse.id);
       setSelectedCourse(detailed);
-      
+
       // Update in course list as well
       setCourses(prev => prev.map(c => c.id === selectedCourse.id ? { ...c, ...detailed } : c));
     } catch (err: any) {
@@ -381,11 +399,11 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
         try {
           await (courseService as any).deleteBrochure(selectedCourse.id);
           toast.success('Brochure deleted successfully');
-          
+
           // Update selected course details in UI
           const detailed = await courseService.getById(selectedCourse.id);
           setSelectedCourse(detailed);
-          
+
           // Update in course list as well
           setCourses(prev => prev.map(c => c.id === selectedCourse.id ? { ...c, ...detailed } : c));
         } catch (err: any) {
@@ -437,7 +455,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
         duration: courseDuration || '4 Weeks',
         learningOutcomes: outcomesArray,
         status: 'Draft',
-        weeks: [{ id: 'w_' + Math.random().toString(36).substring(7), number: 1, title: 'Introduction' }]
+        weeks: [{ id: 'w_' + Math.random().toString(36).substring(7), number: 1, title: 'Introduction' }] as any
       });
       await loadProjectCoordinatorData();
       setIsCourseModalOpen(false);
@@ -843,6 +861,12 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           requiredTech: capstoneTech,
           deliverables: capstoneDeliverables,
           instructions: capstoneInstructions,
+          difficulty: capstoneDifficulty,
+          duration: capstoneDuration,
+          category: capstoneCategory,
+          evaluationCriteria: capstoneEvaluation,
+          sampleOutput: capstoneSampleOutput,
+          referenceMaterials: capstoneReferences,
         });
         alert('Capstone project updated successfully!');
       } else {
@@ -854,6 +878,12 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
           requiredTech: capstoneTech,
           deliverables: capstoneDeliverables,
           instructions: capstoneInstructions,
+          difficulty: capstoneDifficulty,
+          duration: capstoneDuration,
+          category: capstoneCategory,
+          evaluationCriteria: capstoneEvaluation,
+          sampleOutput: capstoneSampleOutput,
+          referenceMaterials: capstoneReferences,
         });
         alert('Capstone project created successfully!');
       }
@@ -864,6 +894,12 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       setCapstoneTech('');
       setCapstoneDeliverables('');
       setCapstoneInstructions('');
+      setCapstoneDifficulty('Intermediate');
+      setCapstoneDuration('4 Weeks');
+      setCapstoneCategory('');
+      setCapstoneEvaluation('');
+      setCapstoneSampleOutput('');
+      setCapstoneReferences('');
       setEditingCapstoneProject(null);
 
       const updatedProjs = await capstoneService.getProjectsByCourse(selectedCourse.id);
@@ -881,6 +917,12 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     setCapstoneTech(proj.requiredTech);
     setCapstoneDeliverables(proj.deliverables);
     setCapstoneInstructions(proj.instructions);
+    setCapstoneDifficulty(proj.difficulty || 'Intermediate');
+    setCapstoneDuration(proj.duration || '4 Weeks');
+    setCapstoneCategory(proj.category || '');
+    setCapstoneEvaluation(proj.evaluationCriteria || '');
+    setCapstoneSampleOutput(proj.sampleOutput || '');
+    setCapstoneReferences(proj.referenceMaterials || '');
     setIsCapstoneModalOpen(true);
   };
 
@@ -1598,8 +1640,8 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                   key={course.id}
                   onClick={() => handleSelectCourse(course)}
                   className={`cursor-pointer border-l-4 transition-all text-left ${selectedCourse?.id === course.id
-                      ? 'border-l-primary bg-primary/5 shadow-md'
-                      : 'border-l-transparent hover:bg-secondary/10'
+                    ? 'border-l-primary bg-primary/5 shadow-md'
+                    : 'border-l-transparent hover:bg-secondary/10'
                     }`}
                 >
                   <CardHeader className="p-4 space-y-2">
@@ -1812,9 +1854,31 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                 <div className="space-y-4 text-left">
                   <div className="flex justify-between items-center bg-secondary/5 p-2 rounded-lg border border-border/40">
                     <h4 className="text-xs font-bold font-display text-muted-foreground uppercase tracking-wider pl-1">Course Module Curriculum</h4>
-                    <Button size="sm" onClick={() => { setEditingWeekId(null); setWeekTitle(''); setIsWeekModalOpen(true); }} className="text-xs h-8">
-                      <Plus className="mr-1 h-3.5 w-3.5" /> Add Module
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" onClick={() => { setEditingWeekId(null); setWeekTitle(''); setIsWeekModalOpen(true); }} className="text-xs h-8">
+                        <Plus className="mr-1 h-3.5 w-3.5" /> Add Module
+                      </Button>
+                      {capstoneProjects.length < 5 && (
+                        <Button size="sm" onClick={() => {
+                          setEditingCapstoneProject(null);
+                          setCapstoneTitle('');
+                          setCapstoneProblem('');
+                          setCapstoneObjectives('');
+                          setCapstoneTech('');
+                          setCapstoneDeliverables('');
+                          setCapstoneInstructions('');
+                          setCapstoneDifficulty('Intermediate');
+                          setCapstoneDuration('4 Weeks');
+                          setCapstoneCategory('Full Stack');
+                          setCapstoneEvaluation('');
+                          setCapstoneSampleOutput('');
+                          setCapstoneReferences('');
+                          setIsCapstoneModalOpen(true);
+                        }} className="text-xs h-8 bg-amber-500 hover:bg-amber-600 text-white border-none shadow-sm">
+                          <Plus className="mr-1 h-3.5 w-3.5" /> Add Capstone Project
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {(() => {
@@ -1823,7 +1887,10 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                       <div className="space-y-3">
                         {weeks.map((week) => {
                           const isExpanded = expandedWeeks[week.id];
-                          const { lessons, assignments, quizzes } = getWeekItems(week.id, selectedCourse);
+                          const isProject = week.type === 'Project';
+                          const { lessons, assignments, quizzes } = isProject 
+                            ? { lessons: [], assignments: [], quizzes: [] }
+                            : getWeekItems(week.id, selectedCourse);
                           return (
                             <Card key={week.id} className="overflow-hidden border border-border shadow-sm">
                               {/* Module Header - Accordion Toggle */}
@@ -1832,92 +1899,95 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                                 className="p-4 bg-secondary/10 hover:bg-secondary/15 flex flex-col sm:flex-row sm:items-center justify-between cursor-pointer transition-colors border-b border-border/40 gap-3"
                               >
                                 <div className="flex items-center space-x-2">
-                                  <span className="font-bold text-sm text-foreground">Module {week.number} — {week.title}</span>
-                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-background/60 text-muted-foreground border-border/80">
-                                    {lessons.length} lessons • {quizzes.length} quizzes • {assignments.length} assignments
-                                  </Badge>
+                                  <span className="font-bold text-sm text-foreground">
+                                    Module {week.number} {isProject ? '(Project)' : ''} — {week.title}
+                                  </span>
+                                  {!isProject && (
+                                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-background/60 text-muted-foreground border-border/80">
+                                      {lessons.length} lessons • {quizzes.length} quizzes • {assignments.length} assignments
+                                    </Badge>
+                                  )}
                                 </div>
 
                                 {/* Header Actions */}
                                 <div className="flex flex-wrap items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                  <Button variant="ghost" size="sm" onClick={() => {
-                                    const mod = courseModules.find(m => m.id === week.id);
-                                    setEditingWeekId(week.id);
-                                    setWeekTitle(week.title);
-                                    setWeekDescription(mod?.description || '');
-                                    setIsWeekModalOpen(true);
-                                  }} className="h-7 text-[10px] px-2" title="Edit Week Title">
-                                    Edit Title
-                                  </Button>
-                                  <Button variant="outline" size="sm" onClick={() => { setActiveWeekId(week.id); setEditingLesson(null); setLessonTitle(''); setLessonContent(''); setLessonVideo(''); setLessonPdf(''); setLessonDuration(''); setLessonOrder((lessons.length + 1).toString()); setIsLessonModalOpen(true); }} className="h-7 text-[10px] px-2">
-                                    + Lesson
-                                  </Button>
-                                  <Button variant="outline" size="sm" onClick={() => { setActiveWeekId(week.id); setEditingQuiz(null); setQuizTitle(''); setQuizPassing('70'); setQuizTimeLimit('30'); setQuestions([{ id: 'q1', text: '', type: 'MCQ', options: ['', '', '', ''], correctOption: 0, correctOptions: [] }]); setIsQuizModalOpen(true); }} className="h-7 text-[10px] px-2">
-                                    + Quiz
-                                  </Button>
-                                  <Button variant="outline" size="sm" onClick={() => { setActiveWeekId(week.id); setEditingAssignment(null); setAssignmentTitle(''); setAssignmentInstructions(''); setAssignmentAttachment(''); setAssignmentDue(''); setAssignmentMaxMarks('100'); setAssignmentSubtype('File Upload'); setAssignmentRules(''); setIsAssignmentModalOpen(true); }} className="h-7 text-[10px] px-2">
-                                    + Task
-                                  </Button>
-                                  {week.title.toLowerCase().includes('capstone') && (
-                                    <Button variant="outline" size="sm" onClick={() => {
-                                      setEditingCapstoneProject(null);
-                                      setCapstoneTitle('');
-                                      setCapstoneProblem('');
-                                      setCapstoneObjectives('');
-                                      setCapstoneTech('');
-                                      setCapstoneDeliverables('');
-                                      setCapstoneInstructions('');
-                                      setIsCapstoneModalOpen(true);
-                                    }} className="h-7 text-[10px] px-2 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/25">
-                                      + Capstone
-                                    </Button>
+                                  {isProject ? (
+                                    <>
+                                      <Button variant="outline" size="sm" onClick={() => {
+                                        handleEditCapstoneProject(week.capstoneProject);
+                                      }} className="h-7 text-[10px] px-2 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/25">
+                                        Edit Project Details
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => handleDeleteCapstoneProject(week.capstoneProject.id)} className="h-7 text-[10px] px-2 text-destructive hover:bg-destructive/10">
+                                        Delete Project
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button variant="ghost" size="sm" onClick={() => {
+                                        const mod = courseModules.find(m => m.id === week.id);
+                                        setEditingWeekId(week.id);
+                                        setWeekTitle(week.title);
+                                        setWeekDescription(mod?.description || '');
+                                        setIsWeekModalOpen(true);
+                                      }} className="h-7 text-[10px] px-2" title="Edit Week Title">
+                                        Edit Title
+                                      </Button>
+                                      <Button variant="outline" size="sm" onClick={() => { setActiveWeekId(week.id); setEditingLesson(null); setLessonTitle(''); setLessonContent(''); setLessonVideo(''); setLessonPdf(''); setLessonDuration(''); setLessonOrder((lessons.length + 1).toString()); setIsLessonModalOpen(true); }} className="h-7 text-[10px] px-2">
+                                        + Lesson
+                                      </Button>
+                                      <Button variant="outline" size="sm" onClick={() => { setActiveWeekId(week.id); setEditingQuiz(null); setQuizTitle(''); setQuizPassing('70'); setQuizTimeLimit('30'); setQuestions([{ id: 'q1', text: '', type: 'MCQ', options: ['', '', '', ''], correctOption: 0, correctOptions: [] }]); setIsQuizModalOpen(true); }} className="h-7 text-[10px] px-2">
+                                        + Quiz
+                                      </Button>
+                                      <Button variant="outline" size="sm" onClick={() => { setActiveWeekId(week.id); setEditingAssignment(null); setAssignmentTitle(''); setAssignmentInstructions(''); setAssignmentAttachment(''); setAssignmentDue(''); setAssignmentMaxMarks('100'); setAssignmentSubtype('File Upload'); setAssignmentRules(''); setIsAssignmentModalOpen(true); }} className="h-7 text-[10px] px-2">
+                                        + Task
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => handleDeleteWeek(week.id)} className="h-7 text-[10px] px-2 text-destructive hover:bg-destructive/10">
+                                        Delete Module
+                                      </Button>
+                                    </>
                                   )}
-                                  <Button variant="ghost" size="sm" onClick={() => handleDeleteWeek(week.id)} className="h-7 text-[10px] px-2 text-destructive hover:bg-destructive/10">
-                                    Delete Module
-                                  </Button>
                                 </div>
                               </div>
 
                               {/* Accordion Content Panel */}
                               {isExpanded && (
                                 <div className="p-4 bg-background space-y-4 animate-fade-in border-t border-border/40">
-                                  {week.title.toLowerCase().includes('capstone') ? (
-                                    <div className="space-y-4 text-left">
-                                      <div className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider mb-1 flex items-center gap-1.5"><Award className="h-3.5 w-3.5 text-amber-500" /> Capstone Project Options (Course Level)</div>
-                                      {capstoneProjects.length === 0 ? (
-                                        <div className="py-8 text-center text-xs text-muted-foreground border border-dashed border-amber-500/30 rounded-lg bg-amber-500/[0.01]">
-                                          No Capstone projects created yet. Click "+ Capstone" above to define the 5 projects.
+                                  {isProject ? (
+                                    <div className="space-y-4 text-left p-2">
+                                      <div className="border border-border p-4 rounded-xl space-y-3 bg-slate-50/50">
+                                        <div className="flex items-center justify-between">
+                                          <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/20">
+                                            Capstone Project Configuration
+                                          </Badge>
                                         </div>
-                                      ) : (
-                                        <div className="space-y-2">
-                                          {capstoneProjects.map((proj, pIdx) => (
-                                            <div key={proj.id} className="p-3 border border-border rounded-lg bg-secondary/5 flex items-center justify-between hover:bg-secondary/10 transition-all">
-                                              <div className="flex items-start space-x-3 text-left">
-                                                <div className="mt-0.5 p-1 bg-amber-500/10 text-amber-500 rounded">
-                                                  <Award className="h-3.5 w-3.5" />
-                                                </div>
-                                                <div className="min-w-0">
-                                                  <p className="text-xs font-bold text-foreground truncate">{proj.title}</p>
-                                                  <p className="text-[10px] text-muted-foreground truncate max-w-sm mt-0.5">{proj.problemStatement}</p>
-                                                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                                    <span className="text-[8px] font-bold uppercase bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded">
-                                                      Tech: {proj.requiredTech}
-                                                    </span>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                              <div className="flex items-center gap-1 shrink-0 ml-4">
-                                                <Button variant="ghost" size="sm" onClick={() => handleEditCapstoneProject(proj)} className="h-7 text-[10px] px-2 text-[#0F4C81]">
-                                                  <Edit className="h-3 w-3 mr-1" /> Edit
-                                                </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => handleDeleteCapstoneProject(proj.id)} className="h-7 text-[10px] px-2 text-destructive">
-                                                  <Trash className="h-3 w-3 mr-1" /> Delete
-                                                </Button>
-                                              </div>
-                                            </div>
-                                          ))}
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <div>
+                                            <span className="text-[9px] uppercase font-bold text-muted-foreground block">Difficulty</span>
+                                            <span className="text-xs font-semibold text-foreground">{week.capstoneProject.difficulty || 'Intermediate'}</span>
+                                          </div>
+                                          <div>
+                                            <span className="text-[9px] uppercase font-bold text-muted-foreground block">Duration</span>
+                                            <span className="text-xs font-semibold text-foreground">{week.capstoneProject.duration || '4 Weeks'}</span>
+                                          </div>
                                         </div>
-                                      )}
+                                        <div>
+                                          <span className="text-[9px] uppercase font-bold text-muted-foreground block">Problem Statement</span>
+                                          <p className="text-xs text-slate-650 leading-relaxed mt-0.5 whitespace-pre-line">{week.capstoneProject.problemStatement}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-[9px] uppercase font-bold text-muted-foreground block">Objectives</span>
+                                          <p className="text-xs text-slate-650 leading-relaxed mt-0.5 whitespace-pre-line">{week.capstoneProject.objectives}</p>
+                                        </div>
+                                        <div>
+                                          <span className="text-[9px] uppercase font-bold text-muted-foreground block">Required Tech Stack</span>
+                                          <span className="text-xs text-foreground font-semibold">{week.capstoneProject.requiredTech}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-[9px] uppercase font-bold text-muted-foreground block">Expected Deliverables</span>
+                                          <p className="text-xs text-slate-650 leading-relaxed mt-0.5">{week.capstoneProject.deliverables}</p>
+                                        </div>
+                                      </div>
                                     </div>
                                   ) : lessons.length === 0 && quizzes.length === 0 && assignments.length === 0 ? (
                                     <div className="py-8 text-center text-xs text-muted-foreground border border-dashed rounded-lg">
@@ -2154,8 +2224,8 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                         key={day.toISOString()}
                         onClick={() => setSelectedCalendarDate(day)}
                         className={`aspect-square flex flex-col justify-between items-center p-1 rounded-md hover:bg-secondary/40 cursor-pointer relative font-semibold transition-all ${isSelected ? 'bg-primary text-white scale-105 shadow-sm shadow-primary/30' :
-                            isToday ? 'bg-primary/10 text-primary border border-primary/20' :
-                              'text-foreground'
+                          isToday ? 'bg-primary/10 text-primary border border-primary/20' :
+                            'text-foreground'
                           }`}
                       >
                         <span className="text-[10px]">{day.getDate()}</span>
@@ -2198,7 +2268,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                           <div className="flex items-center justify-between gap-1.5">
                             <span className="font-bold text-foreground leading-snug truncate">{ev.title}</span>
                             <span className={`h-2 w-2 rounded-full shrink-0 ${ev.type === 'assignment' ? 'bg-blue-500' :
-                                ev.type === 'quiz' ? 'bg-emerald-500' : 'bg-purple-500'
+                              ev.type === 'quiz' ? 'bg-emerald-500' : 'bg-purple-500'
                               }`} title={ev.type} />
                           </div>
                           <p className="text-[10px] text-muted-foreground truncate font-medium">Course: {ev.courseName}</p>
@@ -2227,7 +2297,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       );
     }
     const extension = fileUrl.split('.').pop()?.toLowerCase();
-    
+
     if (extension === 'pdf') {
       return (
         <iframe
@@ -2275,7 +2345,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
   const renderGrading = () => {
     const domainName = user?.domain || 'Not Assigned';
     const domainInterns = internsMonitoring.filter((i: any) => i.domain?.toLowerCase() === domainName?.toLowerCase());
-    
+
     const filteredInterns = domainInterns.filter(
       u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (u.employeeId && u.employeeId.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -2284,10 +2354,10 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
 
     const filteredSubmissions = submissions.filter((sub) => {
       // 1. Filter by status
-      const mappedStatus = sub.status === 'PENDING' 
-        ? 'PENDING' 
+      const mappedStatus = sub.status === 'PENDING'
+        ? 'PENDING'
         : (sub.isApproved ? 'APPROVED' : 'REJECTED');
-      
+
       if (projectStatusFilter !== 'ALL' && mappedStatus !== projectStatusFilter) {
         return false;
       }
@@ -2303,10 +2373,10 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       const title = (sub.assignmentTitle || '').toLowerCase();
 
       return studentName.includes(query) ||
-             courseName.includes(query) ||
-             courseDomain.includes(query) ||
-             moduleName.includes(query) ||
-             title.includes(query);
+        courseName.includes(query) ||
+        courseDomain.includes(query) ||
+        moduleName.includes(query) ||
+        title.includes(query);
     });
 
     return (
@@ -2322,31 +2392,28 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
         <div className="flex space-x-1 border-b border-slate-200/80 pb-px">
           <button
             onClick={() => setActiveGradesTab('progress')}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px cursor-pointer ${
-              activeGradesTab === 'progress'
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px cursor-pointer ${activeGradesTab === 'progress'
                 ? 'border-[#0F4C81] text-[#0F4C81]'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
-            }`}
+              }`}
           >
             Intern Progress Directory
           </button>
           <button
             onClick={() => setActiveGradesTab('submissions')}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px cursor-pointer ${
-              activeGradesTab === 'submissions'
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px cursor-pointer ${activeGradesTab === 'submissions'
                 ? 'border-[#0F4C81] text-[#0F4C81]'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
-            }`}
+              }`}
           >
             Project Submissions Review
           </button>
           <button
             onClick={() => setActiveGradesTab('capstone')}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px cursor-pointer ${
-              activeGradesTab === 'capstone'
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px cursor-pointer ${activeGradesTab === 'capstone'
                 ? 'border-[#0F4C81] text-[#0F4C81]'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
-            }`}
+              }`}
           >
             Capstone Submissions Review
           </button>
@@ -2462,7 +2529,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                   <CardTitle className="text-sm font-bold font-display text-slate-800">Submitted Projects ({filteredSubmissions.length})</CardTitle>
                   <CardDescription className="text-xs text-slate-400 mt-0.5">Manage intern evaluations, grades, and code submissions.</CardDescription>
                 </div>
-                
+
                 {/* Search and Filters row */}
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="relative w-64">
@@ -2488,11 +2555,10 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                           key={filter}
                           type="button"
                           onClick={() => setProjectStatusFilter(filter)}
-                          className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                            projectStatusFilter === filter
+                          className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${projectStatusFilter === filter
                               ? 'bg-white text-slate-800 shadow-xs'
                               : 'text-slate-500 hover:text-slate-700'
-                          }`}
+                            }`}
                         >
                           {filter.charAt(0) + filter.slice(1).toLowerCase()} ({count})
                         </button>
@@ -2530,10 +2596,10 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {filteredSubmissions.map((sub) => {
-                        const statusLabel = sub.status === 'PENDING' 
-                          ? 'Pending' 
+                        const statusLabel = sub.status === 'PENDING'
+                          ? 'Pending'
                           : (sub.isApproved ? 'Approved' : 'Rejected');
-                        
+
                         const statusColor = statusLabel === 'Approved'
                           ? 'success'
                           : (statusLabel === 'Rejected' ? 'destructive' : 'warning');
@@ -2631,7 +2697,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                     (sub.studentName || '').toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
                     (sub.studentEmail || '').toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
                     (sub.project?.title || '').toLowerCase().includes(projectSearchTerm.toLowerCase()) ||
-                    (sub.project?.course?.title || '').toLowerCase().includes(projectSearchTerm.toLowerCase());
+                    (courses.find(c => c.id === sub.project?.courseId)?.title || '').toLowerCase().includes(projectSearchTerm.toLowerCase());
                   return studentMatch;
                 });
 
@@ -2661,7 +2727,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                         {filtered.map((sub) => {
                           const statusColor =
                             sub.status === 'APPROVED' ? 'success' :
-                            sub.status === 'REJECTED' ? 'destructive' : 'outline';
+                              sub.status === 'REJECTED' ? 'destructive' : 'outline';
                           return (
                             <tr key={sub.id} className="hover:bg-slate-50/50 transition-colors">
                               <td className="p-4">
@@ -2672,7 +2738,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                               <td className="p-4 uppercase tracking-wider text-[9px] font-bold text-slate-400">{sub.studentDomain || 'N/A'}</td>
                               <td className="p-4">
                                 <div className="font-bold text-slate-800">{sub.project?.title}</div>
-                                <div className="text-[10px] text-muted-foreground mt-0.5">{sub.project?.course?.title}</div>
+                                <div className="text-[10px] text-muted-foreground mt-0.5">{courses.find(c => c.id === sub.project?.courseId)?.title}</div>
                               </td>
                               <td className="p-4 text-slate-500">
                                 {new Date(sub.submittedAt).toLocaleDateString(undefined, {
@@ -2779,7 +2845,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       const domainCourses = allCoursesList.filter(
         (c: any) => c.domain?.toLowerCase() === dbDomainName.toLowerCase()
       );
-      
+
       let totalModules = 0;
       domainCourses.forEach((c: any) => {
         const weeks = c.weeks || [];
@@ -2789,7 +2855,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
       const progressPcts = domainInterns.flatMap((i: any) =>
         (i.coursesProgress || []).map((cp: any) => cp.progressPercent || 0)
       );
-      
+
       const avgProgress = progressPcts.length > 0
         ? Math.round(progressPcts.reduce((a: number, b: number) => a + b, 0) / progressPcts.length)
         : 0;
@@ -2805,11 +2871,11 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
     if (activeDetailDomain) {
       const dbDomainName = activeDetailDomain;
       const displayDomainName = mapDomainNameToDisplay(dbDomainName);
-      
+
       const domainCourses = allCoursesList.filter(
         (c: any) => c.domain?.toLowerCase() === dbDomainName.toLowerCase()
       );
-      
+
       const enrolledInterns = internsMonitoring.filter((intern: any) => {
         if (intern.domain?.toLowerCase() === dbDomainName.toLowerCase()) return true;
         return (intern.coursesProgress || []).some((cp: any) => {
@@ -2985,7 +3051,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                         const course = allCoursesList.find((c: any) => c.id === cp.courseId);
                         return course?.domain?.toLowerCase() === dbDomainName.toLowerCase();
                       }) || intern.coursesProgress?.[0];
-                      
+
                       const pct = primary?.progressPercent || 0;
                       const hasActiveCourse = !!primary;
 
@@ -3104,7 +3170,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                       <span className="text-base font-extrabold text-slate-700 mt-1 block tabular-nums text-left">{stats.avgProgress}%</span>
                     </div>
                   </div>
-                  
+
                   <div className="mt-4 flex items-center gap-2">
                     <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden border border-slate-50">
                       <div className={`h-full rounded-full transition-all duration-300 ${getProgressColor(stats.avgProgress)}`} style={{ width: `${stats.avgProgress}%` }} />
@@ -4168,7 +4234,7 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
                       Submitted: {new Date(selectedSub.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     <div className="text-left">
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block leading-none">Student Name</span>
@@ -4413,13 +4479,43 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
             onChange={(e) => setCapstoneTech(e.target.value)}
             required
           />
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Difficulty Level</label>
+              <select
+                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm"
+                value={capstoneDifficulty}
+                onChange={(e) => setCapstoneDifficulty(e.target.value)}
+              >
+                <option value="Beginner">Beginner</option>
+                <option value="Intermediate">Intermediate</option>
+                <option value="Advanced">Advanced</option>
+              </select>
+            </div>
+            <div>
+              <Input
+                label="Duration"
+                placeholder="e.g. 4 Weeks"
+                value={capstoneDuration}
+                onChange={(e) => setCapstoneDuration(e.target.value)}
+              />
+            </div>
+            <div>
+              <Input
+                label="Category"
+                placeholder="e.g. Full Stack"
+                value={capstoneCategory}
+                onChange={(e) => setCapstoneCategory(e.target.value)}
+              />
+            </div>
+          </div>
           <Textarea
             label="Expected Deliverables"
             placeholder="List final submission deliverables..."
             value={capstoneDeliverables}
             onChange={(e) => setCapstoneDeliverables(e.target.value)}
             required
-            rows={3}
+            rows={2}
           />
           <Textarea
             label="Submission Instructions"
@@ -4427,7 +4523,28 @@ export const ProjectCoordinatorDashboard: React.FC = () => {
             value={capstoneInstructions}
             onChange={(e) => setCapstoneInstructions(e.target.value)}
             required
-            rows={3}
+            rows={2}
+          />
+          <Textarea
+            label="Evaluation Criteria"
+            placeholder="Define what criteria (code quality, design, tests) will be assessed..."
+            value={capstoneEvaluation}
+            onChange={(e) => setCapstoneEvaluation(e.target.value)}
+            rows={2}
+          />
+          <Textarea
+            label="Sample Output"
+            placeholder="Describe what a successful system output or screenshots should look like..."
+            value={capstoneSampleOutput}
+            onChange={(e) => setCapstoneSampleOutput(e.target.value)}
+            rows={2}
+          />
+          <Textarea
+            label="Reference Materials"
+            placeholder="Provide any guide links or starter repo links..."
+            value={capstoneReferences}
+            onChange={(e) => setCapstoneReferences(e.target.value)}
+            rows={2}
           />
           <div className="flex justify-end gap-3 pt-4 border-t border-border/40">
             <Button type="button" variant="outline" onClick={() => setIsCapstoneModalOpen(false)}>

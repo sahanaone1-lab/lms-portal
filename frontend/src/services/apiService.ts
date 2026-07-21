@@ -4,7 +4,7 @@
  * No localStorage mock — all data is persisted in PostgreSQL.
  */
 import { api, API_URL, getAuthenticatedFileUrl } from './api';
-import { User, Course, Lesson, Module, Assignment, Submission, Quiz, QuizResult, Certificate, Notification, Role, Domain, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord, CapstoneProject, CapstoneSubmission } from '../types';
+import { User, Course, Lesson, Module, Assignment, Submission, Quiz, QuizResult, Certificate, Notification, Role, Domain, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord, CapstoneProject, CapstoneSubmission, ProjectSubmission, ProjectSubmissionStatus } from '../types';
 
 
 // ---------------------------------------------------------------------------
@@ -628,5 +628,70 @@ export const capstoneService = {
     const res = await api.patch(`/capstone/submissions/${id}/review`, data);
     return res.data;
   },
+
+  getCoordinatorSubmissions: async (): Promise<CapstoneSubmission[]> => {
+    const res = await api.get('/capstone/submissions/coordinator');
+    return res.data;
+  },
 };
 
+// ---------------------------------------------------------------------------
+// Project Submissions (dedicated project file submission module)
+// ---------------------------------------------------------------------------
+export const projectSubmissionService = {
+  /**
+   * Upload a project file and save the submission record.
+   * Coordinator is auto-assigned by domain.
+   */
+  upload: async (
+    file: File,
+    title: string,
+    description: string,
+    projectId?: string,
+    onProgress?: (percent: number) => void,
+  ): Promise<{ message: string; submission: ProjectSubmission }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('title', title);
+    formData.append('description', description);
+    if (projectId) formData.append('projectId', projectId);
+
+    const res = await api.post('/project-submissions/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total && onProgress) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percent);
+        }
+      },
+    });
+    return res.data;
+  },
+
+  /** Get all submissions — role-based (intern sees own, coordinator sees domain-matched) */
+  getAll: async (): Promise<ProjectSubmission[]> => {
+    const res = await api.get('/project-submissions');
+    return res.data;
+  },
+
+  /** Get the logged-in intern's submissions */
+  getMySubmissions: async (): Promise<ProjectSubmission[]> => {
+    const res = await api.get('/project-submissions/my');
+    return res.data;
+  },
+
+  /** Get submissions for the logged-in coordinator's domain */
+  getCoordinatorSubmissions: async (): Promise<ProjectSubmission[]> => {
+    const res = await api.get('/project-submissions/coordinator');
+    return res.data;
+  },
+
+  /** Coordinator reviews a submission */
+  review: async (
+    id: string,
+    data: { status: ProjectSubmissionStatus; remarks?: string },
+  ): Promise<ProjectSubmission> => {
+    const res = await api.patch(`/project-submissions/${id}/review`, data);
+    return res.data;
+  },
+};

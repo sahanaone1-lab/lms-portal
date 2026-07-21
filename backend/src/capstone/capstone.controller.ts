@@ -11,6 +11,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { CapstoneService } from './capstone.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -21,13 +22,32 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { S3Service } from '../aws/s3.service';
 
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+
+const ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-zip',
+  'image/jpeg',
+  'image/png',
+];
+
+const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'zip', 'jpg', 'jpeg', 'png'];
+
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('capstone')
 export class CapstoneController {
+  private readonly logger = new Logger(CapstoneController.name);
+
   constructor(
     private readonly capstoneService: CapstoneService,
     private readonly s3Service: S3Service,
-  ) {}
+  ) { }
 
   // ---------------------------------------------------------------------------
   // Projects
@@ -94,6 +114,7 @@ export class CapstoneController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
+      limits: { fileSize: MAX_FILE_SIZE_BYTES },
     }),
   )
   async uploadSubmission(
@@ -104,31 +125,43 @@ export class CapstoneController {
     if (!file) throw new BadRequestException('No file uploaded');
     if (!projectId) throw new BadRequestException('projectId is required');
 
-    // Validate file type (PDF, DOC, DOCX only)
-    const allowedMimeTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ];
-    const allowedExtensions = ['pdf', 'doc', 'docx'];
-    const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
-
-    if (!allowedMimeTypes.includes(file.mimetype) && !allowedExtensions.includes(fileExtension || '')) {
-      throw new BadRequestException('Only PDF (.pdf) and Microsoft Word (.doc, .docx) files are allowed');
+    // File size check
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      throw new BadRequestException(
+        `File too large. Maximum allowed size is 50 MB. Your file is ${(file.size / (1024 * 1024)).toFixed(1)} MB.`,
+      );
     }
 
-    // Upload directly to S3 with 'file-' prefix to enforce access control
-    const s3ObjectKey = await this.s3Service.uploadFile(file, 'file-');
-    const fileUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/uploads/${encodeURIComponent(s3ObjectKey)}`;
+    // File type check
+    const fileExtension = file.originalname.split('.').pop()?.toLowerCase() || '';
+    const isMimeAllowed = ALLOWED_MIME_TYPES.includes(file.mimetype);
+    const isExtAllowed = ALLOWED_EXTENSIONS.includes(fileExtension);
 
-    const submission = await this.capstoneService.saveSubmission(
-      projectId,
-      req.user.id,
-      fileUrl,
-      file.originalname,
-    );
+    if (!isMimeAllowed && !isExtAllowed) {
+      throw new BadRequestException(
+        'Invalid file type. Allowed: PDF, DOC, DOCX, PPT, PPTX, ZIP, JPG, PNG.',
+      );
+    }
 
-    return { fileUrl, originalName: file.originalname, submission };
+    try {
+      // Upload directly to S3 with 'file-' prefix to enforce access control
+      const s3ObjectKey = await this.s3Service.uploadFile(file, 'file-');
+      const fileUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/uploads/${encodeURIComponent(s3ObjectKey)}`;
+
+      const submission = await this.capstoneService.saveSubmission(
+        projectId,
+        req.user.id,
+        fileUrl,
+        file.originalname,
+      );
+
+      return { fileUrl, originalName: file.originalname, submission };
+    } catch (err: any) {
+      this.logger.error('[CapstoneUpload] Error during upload:', err?.message, err?.stack);
+      // Re-throw known NestJS exceptions as-is, wrap unknown ones
+      if (err?.status) throw err;
+      throw new BadRequestException(err?.message || 'Upload failed. Please try again.');
+    }
   }
 
   @Patch('submissions/:id/review')

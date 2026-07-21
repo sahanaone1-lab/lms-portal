@@ -53,9 +53,9 @@ const RoleRoute: React.FC<{ children: React.ReactNode; allowedRoles: Role[] }> =
   if (loading) return <LoadingScreen />;
 
   if (!user || !allowedRoles.includes(user.role)) {
-    if (user?.role === 'ADMIN')      return <Navigate to="/admin" replace />;
+    if (user?.role === 'ADMIN') return <Navigate to="/admin" replace />;
     if (user?.role === 'PROJECT_COORDINATOR') return <Navigate to="/project-coordinator" replace />;
-    if (user?.role === 'INTERN')     return <Navigate to="/intern" replace />;
+    if (user?.role === 'INTERN') return <Navigate to="/intern" replace />;
     return <Navigate to="/home" replace />;
   }
 
@@ -66,7 +66,7 @@ const RoleRoute: React.FC<{ children: React.ReactNode; allowedRoles: Role[] }> =
 const HomeRedirect = () => {
   const { user, isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Navigate to="/home" replace />;
-  if (user?.role === 'ADMIN')      return <Navigate to="/admin" replace />;
+  if (user?.role === 'ADMIN') return <Navigate to="/admin" replace />;
   if (user?.role === 'PROJECT_COORDINATOR') return <Navigate to="/project-coordinator" replace />;
   return <Navigate to="/intern" replace />;
 };
@@ -76,7 +76,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, user, loading } = useAuth();
   if (loading) return <LoadingScreen />;
   if (isAuthenticated) {
-    if (user?.role === 'ADMIN')      return <Navigate to="/admin" replace />;
+    if (user?.role === 'ADMIN') return <Navigate to="/admin" replace />;
     if (user?.role === 'PROJECT_COORDINATOR') return <Navigate to="/project-coordinator" replace />;
     return <Navigate to="/intern" replace />;
   }
@@ -94,7 +94,7 @@ function App() {
               <Route path="/home" element={<HomePage />} />
 
               {/* ── Public Auth Routes (redirect if already logged in) ── */}
-              <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
 
               {/* ── Force Password Change ── */}
               <Route
@@ -110,24 +110,24 @@ function App() {
                 <Route index element={<HomeRedirect />} />
 
                 {/* Admin */}
-                <Route path="admin"         element={<RoleRoute allowedRoles={['ADMIN']}><AdminDashboard /></RoleRoute>} />
-                <Route path="admin/users"   element={<RoleRoute allowedRoles={['ADMIN']}><AdminDashboard /></RoleRoute>} />
+                <Route path="admin" element={<RoleRoute allowedRoles={['ADMIN']}><AdminDashboard /></RoleRoute>} />
+                <Route path="admin/users" element={<RoleRoute allowedRoles={['ADMIN']}><AdminDashboard /></RoleRoute>} />
                 <Route path="admin/courses" element={<RoleRoute allowedRoles={['ADMIN']}><AdminDashboard /></RoleRoute>} />
                 <Route path="admin/domains" element={<RoleRoute allowedRoles={['ADMIN']}><AdminDashboard /></RoleRoute>} />
                 <Route path="admin/presentations" element={<RoleRoute allowedRoles={['ADMIN']}><AdminDashboard /></RoleRoute>} />
 
                 {/* Project Coordinator */}
-                <Route path="project-coordinator"              element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
-                <Route path="project-coordinator/courses"      element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
-                <Route path="project-coordinator/grading"      element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
-                <Route path="project-coordinator/domains"      element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
+                <Route path="project-coordinator" element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
+                <Route path="project-coordinator/courses" element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
+                <Route path="project-coordinator/grading" element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
+                <Route path="project-coordinator/domains" element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
                 <Route path="project-coordinator/certificates" element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
                 <Route path="project-coordinator/presentations" element={<RoleRoute allowedRoles={['PROJECT_COORDINATOR']}><ProjectCoordinatorDashboard /></RoleRoute>} />
 
                 {/* Intern */}
-                <Route path="intern"              element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
-                <Route path="intern/courses"      element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
-                <Route path="intern/enrolled"     element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
+                <Route path="intern" element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
+                <Route path="intern/courses" element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
+                <Route path="intern/enrolled" element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
                 <Route path="intern/certificates" element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
                 <Route path="intern/presentations" element={<RoleRoute allowedRoles={['INTERN']}><InternDashboard /></RoleRoute>} />
 

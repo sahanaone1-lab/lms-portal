@@ -307,8 +307,8 @@ export const DashboardLayout: React.FC = () => {
                 to={item.path}
                 onClick={() => setIsSidebarOpen(false)}
                 className={`group flex items-center gap-3 px-3 h-11 rounded-xl text-sm font-medium transition-all duration-200 relative border-l-[3px] ${isActive
-                    ? 'bg-[#EAF4F8] dark:bg-[#0F4C81]/15 text-[#0F4C81] dark:text-blue-400 font-semibold border-[#0F4C81] dark:border-blue-400 pl-[9px]'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-200 border-transparent pl-[9px]'
+                  ? 'bg-[#EAF4F8] dark:bg-[#0F4C81]/15 text-[#0F4C81] dark:text-blue-400 font-semibold border-[#0F4C81] dark:border-blue-400 pl-[9px]'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-slate-200 border-transparent pl-[9px]'
                   }`}
               >
                 <Icon className={`h-[18px] w-[18px] flex-shrink-0 transition-colors ${isActive ? 'text-[#0F4C81] dark:text-blue-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`} />

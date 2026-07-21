@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+var CapstoneController_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CapstoneController = void 0;
 const common_1 = require("@nestjs/common");
@@ -22,10 +23,25 @@ const client_1 = require("@prisma/client");
 const platform_express_1 = require("@nestjs/platform-express");
 const multer_1 = require("multer");
 const s3_service_1 = require("../aws/s3.service");
-let CapstoneController = class CapstoneController {
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+const ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/x-zip',
+    'image/jpeg',
+    'image/png',
+];
+const ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'zip', 'jpg', 'jpeg', 'png'];
+let CapstoneController = CapstoneController_1 = class CapstoneController {
     constructor(capstoneService, s3Service) {
         this.capstoneService = capstoneService;
         this.s3Service = s3Service;
+        this.logger = new common_1.Logger(CapstoneController_1.name);
     }
     // ---------------------------------------------------------------------------
     // Projects
@@ -56,22 +72,31 @@ let CapstoneController = class CapstoneController {
             throw new common_1.BadRequestException('No file uploaded');
         if (!projectId)
             throw new common_1.BadRequestException('projectId is required');
-        // Validate file type (PDF, DOC, DOCX only)
-        const allowedMimeTypes = [
-            'application/pdf',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        ];
-        const allowedExtensions = ['pdf', 'doc', 'docx'];
-        const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
-        if (!allowedMimeTypes.includes(file.mimetype) && !allowedExtensions.includes(fileExtension || '')) {
-            throw new common_1.BadRequestException('Only PDF (.pdf) and Microsoft Word (.doc, .docx) files are allowed');
+        // File size check
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+            throw new common_1.BadRequestException(`File too large. Maximum allowed size is 50 MB. Your file is ${(file.size / (1024 * 1024)).toFixed(1)} MB.`);
         }
-        // Upload directly to S3 with 'file-' prefix to enforce access control
-        const s3ObjectKey = await this.s3Service.uploadFile(file, 'file-');
-        const fileUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/uploads/${encodeURIComponent(s3ObjectKey)}`;
-        const submission = await this.capstoneService.saveSubmission(projectId, req.user.id, fileUrl, file.originalname);
-        return { fileUrl, originalName: file.originalname, submission };
+        // File type check
+        const fileExtension = file.originalname.split('.').pop()?.toLowerCase() || '';
+        const isMimeAllowed = ALLOWED_MIME_TYPES.includes(file.mimetype);
+        const isExtAllowed = ALLOWED_EXTENSIONS.includes(fileExtension);
+        if (!isMimeAllowed && !isExtAllowed) {
+            throw new common_1.BadRequestException('Invalid file type. Allowed: PDF, DOC, DOCX, PPT, PPTX, ZIP, JPG, PNG.');
+        }
+        try {
+            // Upload directly to S3 with 'file-' prefix to enforce access control
+            const s3ObjectKey = await this.s3Service.uploadFile(file, 'file-');
+            const fileUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/uploads/${encodeURIComponent(s3ObjectKey)}`;
+            const submission = await this.capstoneService.saveSubmission(projectId, req.user.id, fileUrl, file.originalname);
+            return { fileUrl, originalName: file.originalname, submission };
+        }
+        catch (err) {
+            this.logger.error('[CapstoneUpload] Error during upload:', err?.message, err?.stack);
+            // Re-throw known NestJS exceptions as-is, wrap unknown ones
+            if (err?.status)
+                throw err;
+            throw new common_1.BadRequestException(err?.message || 'Upload failed. Please try again.');
+        }
     }
     reviewSubmission(id, req, body) {
         return this.capstoneService.reviewSubmission(id, body.marks, body.remarks, body.status, req.user.id, req.user.role);
@@ -138,6 +163,7 @@ __decorate([
     (0, roles_decorator_1.Roles)(client_1.Role.INTERN),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
         storage: (0, multer_1.memoryStorage)(),
+        limits: { fileSize: MAX_FILE_SIZE_BYTES },
     })),
     __param(0, (0, common_1.UploadedFile)()),
     __param(1, (0, common_1.Body)('projectId')),
@@ -164,7 +190,7 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], CapstoneController.prototype, "getCoordinatorSubmissions", null);
-exports.CapstoneController = CapstoneController = __decorate([
+exports.CapstoneController = CapstoneController = CapstoneController_1 = __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     (0, common_1.Controller)('capstone'),
     __metadata("design:paramtypes", [capstone_service_1.CapstoneService,

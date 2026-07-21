@@ -622,7 +622,7 @@ export const AdminDashboard: React.FC = () => {
 
   const handleBrochureUpload = async (file: File) => {
     if (!selectedCourse) return;
-    
+
     // File validation
     const extension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
     const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.webp'];
@@ -630,7 +630,7 @@ export const AdminDashboard: React.FC = () => {
       toast.error('Only PDF and image files (PNG, JPG, JPEG, WEBP) are allowed');
       return;
     }
-    
+
     try {
       setBrochureUploading(true);
       setBrochureProgress(0);
@@ -640,11 +640,11 @@ export const AdminDashboard: React.FC = () => {
         (percent: number) => setBrochureProgress(percent)
       );
       toast.success('Brochure uploaded successfully');
-      
+
       // Update selected course details in UI
       const detailed = await courseService.getById(selectedCourse.id);
       setSelectedCourse(detailed);
-      
+
       // Update in course list as well
       setCourses(prev => prev.map(c => c.id === selectedCourse.id ? { ...c, ...detailed } : c));
     } catch (err: any) {
@@ -665,11 +665,11 @@ export const AdminDashboard: React.FC = () => {
         try {
           await (courseService as any).deleteBrochure(selectedCourse.id);
           toast.success('Brochure deleted successfully');
-          
+
           // Update selected course details in UI
           const detailed = await courseService.getById(selectedCourse.id);
           setSelectedCourse(detailed);
-          
+
           // Update in course list as well
           setCourses(prev => prev.map(c => c.id === selectedCourse.id ? { ...c, ...detailed } : c));
         } catch (err: any) {
@@ -871,14 +871,14 @@ export const AdminDashboard: React.FC = () => {
         const updatedWeeks = currentWeeks.map(w =>
           w.id === editingWeekId ? { ...w, title: weekTitle } : w
         );
-        await courseService.update(selectedCourse.id, { weeks: updatedWeeks });
+        await courseService.update(selectedCourse.id, { weeks: updatedWeeks as any });
       } else {
         const newWeek = {
           id: 'w_' + Math.random().toString(36).substring(7),
           number: currentWeeks.length + 1,
           title: weekTitle
         };
-        await courseService.update(selectedCourse.id, { weeks: [...currentWeeks, newWeek] });
+        await courseService.update(selectedCourse.id, { weeks: [...currentWeeks, newWeek] as any });
       }
       setIsWeekModalOpen(false);
       setWeekTitle('');
@@ -904,7 +904,7 @@ export const AdminDashboard: React.FC = () => {
           const filteredWeeks = currentWeeks.filter(w => w.id !== weekId);
           const updatedWeeks = filteredWeeks.map((w, idx) => ({ ...w, number: idx + 1 }));
 
-          await courseService.update(selectedCourse.id, { weeks: updatedWeeks });
+          await courseService.update(selectedCourse.id, { weeks: updatedWeeks as any });
 
           const firstWeekId = updatedWeeks[0]?.id || 'w_default';
           const lessons = selectedCourse.lessons || [];
@@ -1811,8 +1811,8 @@ export const AdminDashboard: React.FC = () => {
                   key={course.id}
                   onClick={() => handleSelectCourse(course)}
                   className={`cursor-pointer border-l-4 transition-all text-left ${selectedCourse?.id === course.id
-                      ? 'border-l-primary bg-primary/5 shadow-md'
-                      : 'border-l-transparent hover:bg-secondary/10'
+                    ? 'border-l-primary bg-primary/5 shadow-md'
+                    : 'border-l-transparent hover:bg-secondary/10'
                     }`}
                 >
                   <CardHeader className="p-4 space-y-2">
@@ -2045,7 +2045,7 @@ export const AdminDashboard: React.FC = () => {
                                 className="p-4 bg-secondary/10 hover:bg-secondary/15 flex flex-col sm:flex-row sm:items-center justify-between cursor-pointer transition-colors border-b border-border/40 gap-3"
                               >
                                 <div className="flex items-center space-x-2">
-                                  <span className="font-bold text-sm text-foreground">Module {week.number} — {week.title}</span>
+                                  <span className="font-bold text-sm text-foreground">Module {(week as any).number} — {week.title}</span>
                                   <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-background/60 text-muted-foreground border-border/80">
                                     {lessons.length} lessons • {quizzes.length} quizzes • {assignments.length} assignments
                                   </Badge>

@@ -40,7 +40,7 @@ async function main() {
   const passwordHashIntern = await bcrypt.hash('intern123', 10);
 
   console.log('Creating default users...');
-  
+
   // Create Admin
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@company.com' },
@@ -95,7 +95,7 @@ async function main() {
 
   // 3. Create Base Courses
   console.log('Creating base courses for updates...');
-  
+
   const coursesToCreate = [
     {
       title: 'Machine Learning Training Program',

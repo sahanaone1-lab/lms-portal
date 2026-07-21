@@ -9,7 +9,7 @@ import { Role } from '@prisma/client';
 
 @Injectable()
 export class CapstoneService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   private async checkCoursePermission(courseId: string, userId: string, role: Role) {
     const course = await this.prisma.course.findUnique({
@@ -19,7 +19,7 @@ export class CapstoneService {
 
     if (role !== Role.ADMIN && course.projectCoordinatorId !== userId) {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      const isSameDomain = user && user.role === Role.PROJECT_COORDINATOR && user.domain && 
+      const isSameDomain = user && user.role === Role.PROJECT_COORDINATOR && user.domain &&
         user.domain.toLowerCase() === course.domain.toLowerCase();
       if (!isSameDomain) {
         throw new ForbiddenException('You do not own or have domain permissions for this course');
@@ -242,7 +242,7 @@ export class CapstoneService {
         type: 'capstone_reviewed',
         entityId: submission.project.courseId,
       },
-    }).catch(() => {});
+    }).catch(() => { });
 
     return updated;
   }
@@ -263,13 +263,13 @@ export class CapstoneService {
               { projectCoordinatorId: coordinatorId },
               ...(myDomain
                 ? [
-                    {
-                      domain: {
-                        equals: myDomain,
-                        mode: 'insensitive' as const,
-                      },
+                  {
+                    domain: {
+                      equals: myDomain,
+                      mode: 'insensitive' as const,
                     },
-                  ]
+                  },
+                ]
                 : []),
             ],
           },

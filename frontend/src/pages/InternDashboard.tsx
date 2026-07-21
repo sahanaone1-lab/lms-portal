@@ -6,7 +6,7 @@ import { Button, Input, Textarea, Card, CardHeader, CardTitle, CardDescription, 
 import { VideoPlayer } from '../components/VideoPlayer';
 import { courseService, lessonService, assignmentService, submissionService, quizService, certificateService, projectService, authService, presentationService, presentationRegistrationService, moduleService, capstoneService } from '../services/apiService';
 import { Course, Lesson, Module, Assignment, Submission, Quiz, QuizResult, Certificate, Project, ProjectRegistration, Presentation, PresentationRegistrationRecord, CapstoneProject, CapstoneSubmission } from '../types';
-import { BookOpen, Award, CheckCircle, Play, FileText, HelpCircle, GraduationCap, ArrowLeft, ArrowRight, ExternalLink, Check, Users, Send, Sparkles, Bot, X, Briefcase, Eye, ChevronDown, ChevronRight, Clock, Calendar, Download, Menu } from 'lucide-react';
+import { BookOpen, Award, CheckCircle, Play, FileText, HelpCircle, GraduationCap, ArrowLeft, ArrowRight, ExternalLink, Check, Users, Send, Sparkles, Bot, X, Briefcase, Eye, ChevronDown, ChevronRight, Clock, Calendar, Download, Menu, Upload, Lock } from 'lucide-react';
 import { HeroBanner } from '../components/HeroBanner';
 import { getAuthenticatedFileUrl } from '../services/api';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -312,6 +312,7 @@ export const InternDashboard: React.FC = () => {
   const [expandedLessonId, setExpandedLessonId] = useState<string | null>(null);
   const [isCourseDrawerOpen, setIsCourseDrawerOpen] = useState(false);
 
+
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean;
     title: string;
@@ -436,6 +437,8 @@ export const InternDashboard: React.FC = () => {
     }
   }, [activeCourse]);
 
+
+
   const handleEnroll = async (courseId: string) => {
     try {
       await courseService.enroll(courseId);
@@ -503,17 +506,30 @@ export const InternDashboard: React.FC = () => {
   };
 
   const getCourseWeeks = (course: Course) => {
-    // DB modules take priority (source of truth)
+    let list: any[] = [];
     if (courseModules.length > 0 && courseModules[0].courseId === course.id) {
-      return courseModules.map((m) => ({ id: m.id, number: m.order, title: m.title, type: 'Study' as const }));
+      list = courseModules.map((m) => ({ id: m.id, number: m.order, title: m.title, type: 'Study' as const }));
+    } else if (course.modules && course.modules.length > 0) {
+      list = course.modules.map((m) => ({ id: m.id, number: m.order, title: m.title, type: 'Study' as const }));
+    } else if (course.weeks && course.weeks.length > 0) {
+      list = (course.weeks as any[]).map((w) => ({ id: w.id, number: w.number, title: w.title, type: (w.type || 'Study') as 'Study' | 'Project' }));
+    } else {
+      list = [{ id: 'w_default', number: 1, title: 'Introduction', type: 'Study' as const }];
     }
-    if (course.modules && course.modules.length > 0) {
-      return course.modules.map((m) => ({ id: m.id, number: m.order, title: m.title, type: 'Study' as const }));
+
+    if (capstoneProjects && capstoneProjects.length > 0) {
+      capstoneProjects.forEach((proj) => {
+        list.push({
+          id: `capstone-week-${proj.id}`,
+          number: list.length + 1,
+          title: proj.title,
+          type: 'Project' as const,
+          capstoneProject: proj
+        });
+      });
     }
-    if (course.weeks && course.weeks.length > 0) {
-      return (course.weeks as any[]).map((w) => ({ id: w.id, number: w.number, title: w.title, type: (w.type || 'Study') as 'Study' | 'Project' }));
-    }
-    return [{ id: 'w_default', number: 1, title: 'Introduction', type: 'Study' as const }];
+
+    return list;
   };
 
   const getWeekItems = (weekId: string, course: Course) => {
@@ -544,8 +560,8 @@ export const InternDashboard: React.FC = () => {
 
   const calculateProgress = (course: Course) => {
     const weeks = getCourseWeeks(course);
-    const capstoneWeeks = weeks.filter(w => w.title.toLowerCase().includes('capstone'));
-    const studyWeeks = weeks.filter(w => !w.title.toLowerCase().includes('capstone'));
+    const capstoneWeeks = weeks.filter(w => w.type === 'Project');
+    const studyWeeks = weeks.filter(w => w.type !== 'Project');
 
     let totalItems = 0;
     let completedItemsCount = 0;
@@ -569,8 +585,9 @@ export const InternDashboard: React.FC = () => {
     // Capstone items
     capstoneWeeks.forEach(cw => {
       totalItems += 1;
+      const projId = cw.id.replace('capstone-week-', '');
       const isApproved = myCapstoneSubmissions.some(
-        sub => sub.project?.courseId === course.id && sub.status === 'APPROVED'
+        sub => sub.projectId === projId && sub.status === 'APPROVED'
       );
       if (isApproved) completedItemsCount += 1;
     });
@@ -583,13 +600,12 @@ export const InternDashboard: React.FC = () => {
     const weeks = getCourseWeeks(course);
     const wObj = weeks.find(w => w.id === weekId);
 
-    if (wObj?.title.toLowerCase().includes('capstone')) {
+    if (wObj?.type === 'Project') {
+      const projId = wObj.id.replace('capstone-week-', '');
       return myCapstoneSubmissions.some(
-        (sub) => sub.project?.courseId === course.id && sub.status === 'APPROVED',
+        (sub) => sub.projectId === projId && sub.status === 'APPROVED',
       );
     }
-
-    const isProjectWeek = wObj?.type === 'Project';
 
     const { lessons, assignments, quizzes } = getWeekItems(weekId, course);
 
@@ -602,9 +618,6 @@ export const InternDashboard: React.FC = () => {
     const allAssignmentsDone = assignments.every(a => {
       const sub = mySubmissions[a.id];
       if (!sub) return false;
-      if (isProjectWeek) {
-        return sub.isApproved === true;
-      }
       return true;
     });
 
@@ -833,7 +846,7 @@ export const InternDashboard: React.FC = () => {
                         {isSubmitted && isApproved && <Badge variant="success" className="text-[9px] bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Approved</Badge>}
                       </div>
                       <h4 className="text-sm font-bold text-foreground">{assignment.title}</h4>
-                      <p className="text-xs text-muted-foreground">Due: {new Date(assignment.dueDate).toLocaleDateString()}</p>
+                      <p className="text-xs text-muted-foreground">Due: {assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'N/A'}</p>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
@@ -1002,10 +1015,10 @@ export const InternDashboard: React.FC = () => {
     if (!file) return;
 
     // Validate file extension
-    const allowedExtensions = ['pdf', 'doc', 'docx'];
+    const allowedExtensions = ['pdf', 'doc', 'docx', 'ppt', 'pptx'];
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
     if (!fileExtension || !allowedExtensions.includes(fileExtension)) {
-      alert('Only PDF (.pdf) and Microsoft Word (.doc, .docx) files are allowed.');
+      alert('Only PDF (.pdf), Word (.doc, .docx), and PowerPoint (.ppt, .pptx) files are allowed.');
       if (e.target) e.target.value = '';
       return;
     }
@@ -1026,243 +1039,189 @@ export const InternDashboard: React.FC = () => {
     }
   };
 
-  const renderCapstoneWorkspace = () => {
-    if (!activeCourse) return null;
+  const renderCapstoneWeekWorkspace = (week: any) => {
+    const proj = week.capstoneProject;
+    if (!proj) return null;
 
-    // Check if the student has a submission for ANY project in this course
-    const courseProjectIds = capstoneProjects.map(p => p.id);
-    const existingSubmission = myCapstoneSubmissions.find(s => courseProjectIds.includes(s.projectId));
+    const existingSubmission = myCapstoneSubmissions.find(s => s.projectId === proj.id);
 
     return (
       <div className="space-y-6 text-left animate-fade-in">
-        <div className="p-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+        <div className="p-6 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent rounded-2xl border border-amber-500/25">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-amber-500/10 text-amber-500 rounded-2xl">
               <Award className="h-6 w-6" />
             </div>
             <div>
-              <h3 className="text-lg font-black font-display text-slate-850 dark:text-white">Capstone Project Workspace</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Every course concludes with a real-world, industry-level Capstone Project. Choose one of the five projects below to complete your course validation.
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-amber-600 block">
+                Capstone Module {week.number}
+              </span>
+              <h3 className="text-lg font-black font-display text-slate-850 dark:text-white mt-0.5 uppercase">
+                {proj.title}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                {proj.description || 'Complete the industry capstone project deliverables below to demonstrate your skills.'}
               </p>
             </div>
           </div>
         </div>
 
-        {existingSubmission ? (
-          // Student has selected and submitted a project
-          <Card className="border border-border shadow-sm">
-            <CardHeader className="p-6 border-b border-border/40">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/20 bg-amber-500/[0.02] uppercase font-bold tracking-wider">
-                    Selected Capstone Project
-                  </Badge>
-                  <CardTitle className="text-lg font-bold mt-1.5">{existingSubmission.project?.title || 'Capstone Submission'}</CardTitle>
-                </div>
-                <Badge variant={
-                  existingSubmission.status === 'APPROVED' ? 'success' :
-                  existingSubmission.status === 'REJECTED' ? 'destructive' : 'outline'
-                } className="text-xs px-2.5 py-0.5 shadow-none uppercase font-bold">
-                  {existingSubmission.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              {/* Show project details */}
-              {(() => {
-                const currentProj = capstoneProjects.find(p => p.id === existingSubmission.projectId);
-                if (!currentProj) return null;
-                return (
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Problem Statement</h4>
-                      <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed mt-1">{currentProj.problemStatement}</p>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Objectives</h4>
-                        <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed mt-1 whitespace-pre-wrap">{currentProj.objectives}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Required Technologies</h4>
-                        <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed mt-1">{currentProj.requiredTech}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="border-t border-border/40 pt-4 space-y-4">
-                <div>
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Your Submission</h4>
-                  <div className="flex items-center gap-3 p-3 bg-secondary/20 rounded-xl border border-border/40 max-w-md">
-                    <div className="p-2 bg-rose-50 dark:bg-rose-950/20 rounded-lg text-rose-500 border border-rose-200/40 dark:border-rose-900/30">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-foreground truncate">{existingSubmission.fileName}</p>
-                      <p className="text-[10px] text-muted-foreground">Submitted on {new Date(existingSubmission.submittedAt).toLocaleDateString()}</p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => window.open(getAuthenticatedFileUrl(existingSubmission.fileUrl), '_blank')}
-                      className="text-xs"
-                    >
-                      <Download className="h-3.5 w-3.5 mr-1" /> View/Download
-                    </Button>
-                  </div>
-                </div>
-
-                {existingSubmission.reviewedAt && (
-                  <div className={`p-4 rounded-xl border text-xs space-y-2 ${
-                    existingSubmission.status === 'APPROVED'
-                      ? 'bg-emerald-500/[0.02] border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                      : 'bg-destructive/[0.02] border-destructive/20 text-destructive'
-                  }`}>
-                    <p className="font-bold text-sm flex items-center gap-2">
-                      {existingSubmission.status === 'APPROVED' ? <CheckCircle className="h-5 w-5 text-emerald-500" /> : <X className="h-5 w-5 text-destructive" />}
-                      {existingSubmission.status === 'APPROVED' ? 'Approved & Completed!' : 'Needs Revision'}
-                    </p>
-                    {existingSubmission.marks !== null && (
-                      <p className="text-slate-800 dark:text-slate-200"><strong className="text-foreground">Score:</strong> {existingSubmission.marks} / 100</p>
-                    )}
-                    {existingSubmission.remarks && (
-                      <p className="text-slate-650 dark:text-slate-350"><strong className="text-foreground">Coordinator Remarks:</strong> {existingSubmission.remarks}</p>
-                    )}
-                  </div>
-                )}
-
-                {existingSubmission.status === 'REJECTED' && (
-                  <div className="border-t border-border/40 pt-4 space-y-3">
-                    <h5 className="text-xs font-bold text-amber-600 dark:text-amber-400">↻ Re-submit Final Work</h5>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                      <div className="relative w-full sm:w-auto">
-                        <input
-                          type="file"
-                          id="re-upload-capstone-file"
-                          className="hidden"
-                          accept=".pdf,.doc,.docx"
-                          onChange={(e) => handleCapstoneSubmissionUpload(e, existingSubmission.projectId)}
-                        />
-                        <Button
-                          disabled={capstoneFileUploading}
-                          onClick={() => document.getElementById('re-upload-capstone-file')?.click()}
-                          className="w-full sm:w-auto h-9 text-xs"
-                        >
-                          <Upload className="h-3.5 w-3.5 mr-1.5" />
-                          {capstoneFileUploading ? 'Uploading...' : 'Upload PDF/DOC/DOCX'}
-                        </Button>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground leading-normal">
-                        Select a new file. Once uploaded, your project status will return to pending review.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          // Student needs to select one of the 5 projects
-          <div className="space-y-4">
-            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Available Capstone Projects</h4>
-            {capstoneProjects.length === 0 ? (
-              <div className="p-8 text-center border-2 border-dashed border-border rounded-2xl bg-secondary/5 text-muted-foreground text-xs font-medium">
-                No capstone projects have been configured for this course by the Project Coordinator yet.
-              </div>
-            ) : selectedCapstoneProject ? (
-              // Selected a project to start
-              <Card className="border border-[#0F4C81]/30 bg-[#0F4C81]/[0.01]">
-                <CardHeader className="p-6 border-b border-border/40 flex flex-row items-center justify-between">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column: Requirements (60%) */}
+          <div className="lg:col-span-7 space-y-6">
+            <Card className="border border-border shadow-sm">
+              <CardHeader className="p-5 border-b border-border/40">
+                <CardTitle className="text-sm font-black uppercase tracking-wider text-slate-500">Project Requirements</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-5 text-xs leading-relaxed text-slate-755 dark:text-slate-350">
+                <div className="grid grid-cols-2 gap-4 border-b border-border/40 pb-4 mb-4">
                   <div>
-                    <Badge variant="outline" className="text-[9px] uppercase tracking-wider text-[#17A2B8] border-[#17A2B8]/20 bg-[#17A2B8]/[0.02]">
-                      New Submission Builder
-                    </Badge>
-                    <CardTitle className="text-base font-bold mt-1">{selectedCapstoneProject.title}</CardTitle>
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground block">Difficulty</span>
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{proj.difficulty || 'Intermediate'}</span>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedCapstoneProject(null)} className="h-8 px-2 text-xs">
-                    Cancel Selection
-                  </Button>
-                </CardHeader>
-                <CardContent className="p-6 space-y-5 text-xs leading-relaxed text-slate-750 dark:text-slate-300">
-                  <div className="space-y-3.5">
-                    <div>
-                      <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Problem Statement:</strong>
-                      <p>{selectedCapstoneProject.problemStatement}</p>
-                    </div>
-                    <div>
-                      <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Objectives:</strong>
-                      <p className="whitespace-pre-wrap">{selectedCapstoneProject.objectives}</p>
-                    </div>
-                    <div>
-                      <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Required Technologies:</strong>
-                      <p>{selectedCapstoneProject.requiredTech}</p>
-                    </div>
-                    <div>
-                      <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Deliverables:</strong>
-                      <p className="whitespace-pre-wrap">{selectedCapstoneProject.deliverables}</p>
-                    </div>
-                    <div>
-                      <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Submission Instructions:</strong>
-                      <p className="whitespace-pre-wrap">{selectedCapstoneProject.instructions}</p>
-                    </div>
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-muted-foreground block">Duration</span>
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{proj.duration || '4 Weeks'}</span>
                   </div>
-
-                  <div className="border-t border-border/40 pt-5 space-y-3">
-                    <strong className="text-foreground uppercase tracking-wide block text-[10px] text-muted-foreground">Upload Final Project Work:</strong>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                      <div className="relative">
-                        <input
-                          type="file"
-                          id="upload-capstone-file"
-                          className="hidden"
-                          accept=".pdf,.doc,.docx"
-                          onChange={(e) => handleCapstoneSubmissionUpload(e, selectedCapstoneProject.id)}
-                        />
-                        <Button
-                          disabled={capstoneFileUploading}
-                          onClick={() => document.getElementById('upload-capstone-file')?.click()}
-                          className="w-full sm:w-auto h-9 text-xs"
-                        >
-                          <Upload className="h-3.5 w-3.5 mr-1.5" />
-                          {capstoneFileUploading ? 'Uploading...' : 'Upload PDF/DOC/DOCX'}
-                        </Button>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground leading-normal">
-                        Allowed formats: PDF (.pdf) and Microsoft Word (.doc, .docx). Upload directly to S3.
-                      </p>
-                    </div>
+                </div>
+                <div>
+                  <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Problem Statement:</strong>
+                  <p className="whitespace-pre-line leading-relaxed">{proj.problemStatement}</p>
+                </div>
+                <div>
+                  <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Objectives:</strong>
+                  <p className="whitespace-pre-line leading-relaxed">{proj.objectives}</p>
+                </div>
+                <div>
+                  <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Required Tech Stack:</strong>
+                  <p className="font-semibold text-[#0f4c81] dark:text-blue-300">{proj.requiredTech}</p>
+                </div>
+                <div>
+                  <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Expected Deliverables:</strong>
+                  <p className="whitespace-pre-line leading-relaxed">{proj.deliverables}</p>
+                </div>
+                <div>
+                  <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Evaluation Criteria:</strong>
+                  <p className="whitespace-pre-line leading-relaxed">{proj.evaluationCriteria || 'Assessed on project architecture and database compliance.'}</p>
+                </div>
+                {proj.sampleOutput && (
+                  <div>
+                    <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">Sample Output:</strong>
+                    <p className="whitespace-pre-line leading-relaxed">{proj.sampleOutput}</p>
                   </div>
-                </CardContent>
-              </Card>
-            ) : (
-              // Display the 5 projects list
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {capstoneProjects.slice(0, 5).map((project, idx) => (
-                  <Card key={project.id} className="border border-border/70 hover:border-[#0F4C81]/30 hover:shadow-md transition-all flex flex-col justify-between">
-                    <CardHeader className="p-5 pb-3">
-                      <Badge variant="outline" className="text-[9px] uppercase tracking-wider mb-2 bg-slate-50 dark:bg-slate-900 border-border">
-                        Project Option {idx + 1}
-                      </Badge>
-                      <CardTitle className="text-sm font-bold text-slate-850 dark:text-white leading-snug line-clamp-1">{project.title}</CardTitle>
-                      <CardDescription className="text-xs line-clamp-3 mt-1.5 leading-relaxed">{project.problemStatement}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-5 pt-0 mt-3 flex items-center justify-between gap-3 border-t border-border/30 pt-3">
-                      <span className="text-[10px] font-semibold text-muted-foreground truncate max-w-[120px]">
-                        Tech: {project.requiredTech}
-                      </span>
-                      <Button size="xs" onClick={() => setSelectedCapstoneProject(project)} className="text-[10px] h-7 px-2">
-                        Start Project
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+                )}
+                {proj.referenceMaterials && (
+                  <div>
+                    <strong className="text-foreground uppercase tracking-wide block mb-1 text-[10px] text-muted-foreground">References:</strong>
+                    <p className="whitespace-pre-line leading-relaxed text-[#0f4c81] dark:text-blue-300">{proj.referenceMaterials}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        )}
+
+          {/* Right Column: Submission & Feedback Chat (40%) */}
+          <div className="lg:col-span-5 space-y-6">
+            <Card className="border border-border shadow-sm">
+              <CardHeader className="p-5 border-b border-border/40">
+                <CardTitle className="text-sm font-black uppercase tracking-wider text-slate-500">Workspace Submission</CardTitle>
+              </CardHeader>
+              <CardContent className="p-5 space-y-5 text-xs">
+                {existingSubmission ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-secondary/15 rounded-xl border border-border/40">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="h-5 w-5 text-rose-500 flex-shrink-0" />
+                        <span className="font-bold truncate text-slate-800 dark:text-slate-200">{existingSubmission.fileName}</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.open(getAuthenticatedFileUrl(existingSubmission.fileUrl), '_blank')}
+                        className="text-xs shrink-0"
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1" /> View/Download
+                      </Button>
+                    </div>
+
+                    <div className="p-4 rounded-xl border text-xs space-y-2 bg-slate-50/40">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-muted-foreground uppercase text-[9px] tracking-wider">Status:</span>
+                        <Badge variant={
+                          existingSubmission.status === 'APPROVED' ? 'success' :
+                          existingSubmission.status === 'REJECTED' ? 'destructive' : 'outline'
+                        } className="text-[10px] uppercase font-bold px-2 py-0.5">
+                          {existingSubmission.status}
+                        </Badge>
+                      </div>
+                      {existingSubmission.marks !== null && (
+                        <p><strong className="text-foreground">Score:</strong> {existingSubmission.marks} / 100</p>
+                      )}
+                      {existingSubmission.remarks && (
+                        <p className="text-slate-650 dark:text-slate-350"><strong className="text-foreground">Remarks:</strong> {existingSubmission.remarks}</p>
+                      )}
+                    </div>
+
+                    {existingSubmission.status !== 'APPROVED' && (
+                      <div className="pt-3 border-t border-border/40 space-y-3">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Re-upload Project Work</label>
+                        <div className="flex flex-col sm:flex-row items-center gap-2">
+                          <input
+                            type="file"
+                            id={`re-upload-capstone-${proj.id}`}
+                            className="hidden"
+                            accept=".pdf,.doc,.docx,.ppt,.pptx"
+                            onChange={(e) => handleCapstoneSubmissionUpload(e, proj.id)}
+                          />
+                          <label
+                            htmlFor={capstoneFileUploading ? undefined : `re-upload-capstone-${proj.id}`}
+                            className={`w-full h-9 flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md px-4 cursor-pointer transition-colors ${
+                              capstoneFileUploading
+                                ? 'opacity-50 cursor-not-allowed bg-primary/60 text-white'
+                                : 'bg-primary text-white hover:bg-primary/90'
+                            }`}
+                          >
+                            <Upload className="h-3.5 w-3.5" />
+                            {capstoneFileUploading ? 'Uploading...' : 'Upload PDF/Word/PPT'}
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-xl text-center space-y-2 bg-slate-50/10">
+                      <Upload className="h-8 w-8 text-muted-foreground/45" />
+                      <p className="text-xs font-bold text-slate-600">No submission draft created yet</p>
+                      <p className="text-[10px] text-muted-foreground">Upload your final project file in PDF, PPT, or DOCS format below to begin.</p>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      <input
+                        type="file"
+                        id={`upload-capstone-${proj.id}`}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.ppt,.pptx"
+                        onChange={(e) => handleCapstoneSubmissionUpload(e, proj.id)}
+                      />
+                      <label
+                        htmlFor={capstoneFileUploading ? undefined : `upload-capstone-${proj.id}`}
+                        className={`w-full h-10 flex items-center justify-center gap-2 text-sm font-semibold rounded-md px-4 cursor-pointer transition-colors ${
+                          capstoneFileUploading
+                            ? 'opacity-50 cursor-not-allowed bg-primary/60 text-white'
+                            : 'bg-primary text-white hover:bg-primary/90'
+                        }`}
+                      >
+                        <Upload className="h-4 w-4" />
+                        {capstoneFileUploading ? 'Uploading...' : 'Submit Project File'}
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   };
@@ -1463,9 +1422,7 @@ export const InternDashboard: React.FC = () => {
       const selectedWeek = weeks.find(w => w.id === activeModuleId);
       const selectedWeekIdx = weeks.findIndex(w => w.id === activeModuleId);
       const isProjectWeek = selectedWeek?.type === 'Project';
-      const isCapstoneModule = selectedWeek?.title
-        ? selectedWeek.title.toLowerCase().includes('capstone')
-        : false;
+      const isCapstoneModule = selectedWeek?.type === 'Project';
       const { lessons: moduleItems, quizzes: moduleQuizzes, assignments: moduleAssignments } =
         activeModuleId ? getWeekItems(activeModuleId, activeCourse) : { lessons: [], quizzes: [], assignments: [] };
       const details = getWeekProgressDetails(activeCourse);
@@ -1748,43 +1705,74 @@ export const InternDashboard: React.FC = () => {
                 })()}
 
                 <div className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 lg:max-h-[calc(100vh-400px)]">
-                  {weeks.map((week, wIdx) => {
-                    const isSelected = activeModuleId === week.id;
-                    const isCompleted = isWeekCompleted(week.id, activeCourse);
-                    const isProject = week.type === 'Project';
-                    const projectIndex = isProject
-                      ? weeks.slice(0, wIdx + 1).filter((w) => w.type === 'Project').length
-                      : 0;
+                  {(() => {
+                    const studyWeeks = weeks.filter(w => w.type !== 'Project');
+                    const allStudyCompleted = studyWeeks.every(w => isWeekCompleted(w.id, activeCourse));
 
-                    return (
-                      <button
-                        key={week.id}
-                        onClick={() => {
-                          setActiveModuleId(week.id);
-                          setExpandedLessonId(null);
-                          setIsCourseDrawerOpen(false);
-                          if (isProject) { setActiveProjectWeekId(week.id); setActiveLesson(null); }
-                          else { setActiveProjectWeekId(null); setActiveLesson(null); }
-                        }}
-                        className={`w-full text-left px-4 py-3.5 flex items-center gap-3 transition-all duration-200 border-l-[3px] ${isSelected
-                          ? 'bg-[#EAF4F8] dark:bg-[#0F4C81]/15 border-[#0F4C81] dark:border-blue-400'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
+                    return weeks.map((week, wIdx) => {
+                      const isSelected = activeModuleId === week.id;
+                      const isCompleted = isWeekCompleted(week.id, activeCourse);
+                      const isProject = week.type === 'Project';
+                      const projectIndex = isProject
+                        ? weeks.slice(0, wIdx + 1).filter((w) => w.type === 'Project').length
+                        : 0;
+                      const isLocked = false;
+
+                      return (
+                        <button
+                          key={week.id}
+                          disabled={isLocked}
+                          onClick={() => {
+                            if (isLocked) return;
+                            setActiveModuleId(week.id);
+                            setExpandedLessonId(null);
+                            setIsCourseDrawerOpen(false);
+                            if (isProject) { setActiveProjectWeekId(week.id); setActiveLesson(null); }
+                            else { setActiveProjectWeekId(null); setActiveLesson(null); }
+                          }}
+                          className={`w-full text-left px-4 py-3.5 flex items-center gap-3 transition-all duration-200 border-l-[3px] ${
+                            isSelected
+                              ? 'bg-[#EAF4F8] dark:bg-[#0F4C81]/15 border-[#0F4C81] dark:border-blue-400'
+                              : isLocked
+                                ? 'opacity-40 cursor-not-allowed border-transparent'
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
                           }`}
-                      >
-                        <div className={`flex-shrink-0 h-9 w-9 rounded-xl flex items-center justify-center text-xs font-bold transition-colors ${isSelected
-                          ? 'bg-[#0F4C81] dark:bg-blue-600 text-white shadow-sm'
-                          : isCompleted ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                          title={isLocked ? "Complete all preceding modules to unlock Capstone Projects" : ""}
+                        >
+                          <div className={`flex-shrink-0 h-9 w-9 rounded-xl flex items-center justify-center text-xs font-bold transition-colors ${
+                            isSelected
+                              ? 'bg-[#0F4C81] dark:bg-blue-600 text-white shadow-sm'
+                              : isCompleted
+                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                : isLocked
+                                  ? 'bg-slate-150 text-slate-400 dark:bg-slate-900 border border-slate-200 dark:border-slate-800'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                           }`}>
-                          {isCompleted ? <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-sm">✓</span> : <span>{isProject ? `P${projectIndex}` : wIdx + 1}</span>}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${isSelected ? 'text-[#17A2B8]' : isProject ? 'text-amber-500' : 'text-slate-400 dark:text-slate-500'}`}>
-                            {isProject ? `Project ${projectIndex}` : `Module ${wIdx + 1}`}
+                            {isCompleted ? (
+                              <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-sm">✓</span>
+                            ) : isLocked ? (
+                              <Lock className="h-3.5 w-3.5 text-slate-400" />
+                            ) : (
+                              <span>{isProject ? `P${projectIndex}` : wIdx + 1}</span>
+                            )}
                           </div>
-                          <div className={`text-xs leading-snug font-medium ${isSelected ? 'text-[#0F4C81] dark:text-blue-300 font-semibold' : 'text-slate-700 dark:text-slate-300'}`}>
-                            {week.title}
-                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${
+                              isSelected
+                                ? 'text-[#17A2B8]'
+                                : isProject
+                                  ? 'text-amber-500'
+                                  : 'text-slate-400 dark:text-slate-500'
+                            }`}>
+                              {isProject ? `Project ${projectIndex}` : `Module ${wIdx + 1}`}
+                            </div>
+                            <div className={`text-xs leading-snug font-medium ${
+                              isSelected
+                                ? 'text-[#0F4C81] dark:text-blue-300 font-semibold'
+                                : 'text-slate-700 dark:text-slate-300'
+                            }`}>
+                              {week.title}
+                            </div>
                           {isCompleted && (
                             <div className="mt-1 flex flex-col gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
                               {(() => {
@@ -1816,8 +1804,9 @@ export const InternDashboard: React.FC = () => {
                         <ChevronRight className={`h-4 w-4 flex-shrink-0 transition-colors ${isSelected ? 'text-[#0F4C81] dark:text-blue-400' : 'text-slate-300 dark:text-slate-600'}`} />
                       </button>
                     );
-                  })}
-                </div>
+                  });
+                })()}
+              </div>
                 {/* Progress + Certificate */}
                 {(() => {
                   const activeRequest = certificates.find(c => c.courseId === activeCourse.id);
@@ -1863,7 +1852,7 @@ export const InternDashboard: React.FC = () => {
             {/* RIGHT COLUMN — Lesson Accordion (70%) */}
             <div className="flex-1 min-w-0 flex flex-col gap-4">
               {isCapstoneModule ? (
-                renderCapstoneWorkspace()
+                renderCapstoneWeekWorkspace(selectedWeek)
               ) : isProjectWeek && activeProjectWeekId ? (
                 renderProjectWorkspace()
               ) : selectedWeek ? (
@@ -2520,7 +2509,7 @@ export const InternDashboard: React.FC = () => {
         {selectedAssignment && (
           <form onSubmit={handleSubmitAssignment} className="space-y-4">
             <div className="p-4 border border-border/85 rounded-lg bg-secondary/15">
-              <p className="text-xs text-muted-foreground font-semibold">Due: {new Date(selectedAssignment.dueDate).toLocaleDateString()}</p>
+              <p className="text-xs text-muted-foreground font-semibold">Due: {selectedAssignment.dueDate ? new Date(selectedAssignment.dueDate).toLocaleDateString() : 'N/A'}</p>
               <p className="text-sm font-semibold mt-1">Instructions:</p>
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{selectedAssignment.instruction}</p>
               {selectedAssignment.attachmentUrl && (

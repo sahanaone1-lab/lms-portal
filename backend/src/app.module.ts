@@ -18,6 +18,7 @@ import { PresentationRegistrationsModule } from './presentation-registrations/pr
 import { AwsModule } from './aws/aws.module';
 import { ModulesModule } from './modules/modules.module';
 import { CapstoneModule } from './capstone/capstone.module';
+import { ProjectSubmissionsModule } from './project-submissions/project-submissions.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { CapstoneModule } from './capstone/capstone.module';
     AwsModule,
     ModulesModule,
     CapstoneModule,
+    ProjectSubmissionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

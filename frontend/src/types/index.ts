@@ -272,6 +272,12 @@ export interface CapstoneProject {
   deliverables: string;
   instructions: string;
   courseId: string;
+  difficulty?: string;
+  duration?: string;
+  category?: string;
+  evaluationCriteria?: string;
+  sampleOutput?: string;
+  referenceMaterials?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -297,3 +303,53 @@ export interface CapstoneSubmission {
   reviewedAt?: string;
 }
 
+export type ProjectSubmissionStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
+
+export interface ProjectSubmission {
+  id: string;
+
+  // Project details
+  title: string;
+  description: string;
+
+  // Student info
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  student?: {
+    name: string;
+    email: string;
+    domain?: string;
+    employeeId?: string;
+  };
+
+  // Course / Domain
+  courseId?: string;
+  domain: string;
+
+  // Coordinator
+  projectCoordinatorId: string;
+  projectCoordinator?: {
+    name: string;
+    email: string;
+  };
+
+  // Linked project (optional)
+  projectId?: string;
+  project?: {
+    title: string;
+    domain?: string;
+  };
+
+  // File
+  fileUrl: string;
+  fileName: string;
+
+  // Status tracking
+  status: ProjectSubmissionStatus;
+  remarks?: string;
+
+  submittedAt: string;
+  updatedAt: string;
+  reviewedAt?: string;
+}
