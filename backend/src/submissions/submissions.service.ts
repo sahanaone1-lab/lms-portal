@@ -13,6 +13,33 @@ import { join } from 'path';
 export class SubmissionsService {
   constructor(private prisma: PrismaService) { }
 
+  private async ensureEnrollment(studentId: string, courseId: string, courseDomain?: string) {
+    let enrollment = await this.prisma.enrollment.findUnique({
+      where: {
+        studentId_courseId: { studentId, courseId },
+      },
+    });
+    if (!enrollment) {
+      const student = await this.prisma.user.findUnique({
+        where: { id: studentId },
+        select: { domain: true },
+      });
+      const isDomainMatch =
+        !courseDomain ||
+        (student?.domain &&
+          student.domain.trim().toLowerCase() === courseDomain.trim().toLowerCase());
+
+      if (isDomainMatch) {
+        enrollment = await this.prisma.enrollment.create({
+          data: { studentId, courseId },
+        });
+      } else {
+        throw new BadRequestException('You are not enrolled in this course');
+      }
+    }
+    return enrollment;
+  }
+
   async submit(
     assignmentId: string,
     studentId: string,
@@ -27,14 +54,8 @@ export class SubmissionsService {
     });
     if (!assignment) throw new NotFoundException('Assignment not found');
 
-    // Check if user is enrolled
-    const enrollment = await this.prisma.enrollment.findUnique({
-      where: {
-        studentId_courseId: { studentId, courseId: assignment.courseId },
-      },
-    });
-    if (!enrollment)
-      throw new BadRequestException('You are not enrolled in this course');
+    // Check if user is enrolled (auto-enroll if domain matches)
+    await this.ensureEnrollment(studentId, assignment.courseId, assignment.course.domain);
 
     // Create or update submission
     const existing = await this.prisma.submission.findFirst({
@@ -100,14 +121,8 @@ export class SubmissionsService {
     });
     if (!assignment) throw new NotFoundException('Assignment not found');
 
-    // Check if user is enrolled
-    const enrollment = await this.prisma.enrollment.findUnique({
-      where: {
-        studentId_courseId: { studentId, courseId: assignment.courseId },
-      },
-    });
-    if (!enrollment)
-      throw new BadRequestException('You are not enrolled in this course');
+    // Check if user is enrolled (auto-enroll if domain matches)
+    await this.ensureEnrollment(studentId, assignment.courseId, assignment.course.domain);
 
     // Create or update submission
     const existing = await this.prisma.submission.findFirst({
@@ -314,7 +329,7 @@ export class SubmissionsService {
     });
     if (!projectCoordinator) return [];
 
-    const myDomain = projectCoordinator.domain;
+    const myDomain = projectCoordinator.domain?.trim();
 
     const whereClause = {
       assignment: {
